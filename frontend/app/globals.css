@@ -1,0 +1,58 @@
+* {
+  box-sizing: border-box;
+}
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  background: #f4f1ea;
+  color: #1c1914;
+}
+a { color: inherit; }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 28px 20px 80px; }
+header.top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin-bottom: 28px; }
+header.top h1 { font-size: 28px; margin: 0; font-weight: 600; }
+header.top p { margin: 6px 0 0; color: #5c564c; font-size: 14px; }
+nav a { font-size: 14px; text-decoration: none; border-bottom: 1px solid #1c1914; }
+.card { background: #fffdf8; border: 1px solid #d9d1c3; border-radius: 10px; padding: 18px 20px; margin-bottom: 18px; }
+label { display: block; font-size: 13px; margin-bottom: 6px; color: #5c564c; }
+textarea, input[type="number"] {
+  width: 100%;
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid #cfc6b6;
+  border-radius: 8px;
+  background: #fff;
+}
+textarea { min-height: 90px; }
+.row { display: flex; gap: 12px; align-items: end; margin-top: 12px; }
+button, .btn {
+  font: inherit;
+  background: #1c1914;
+  color: #f4f1ea;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+button.secondary, .btn.secondary { background: transparent; color: #1c1914; border: 1px solid #1c1914; }
+button.danger { background: #7a2e24; }
+button.good { background: #215c38; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #e6dfd3; vertical-align: top; }
+th { font-size: 12px; color: #5c564c; font-weight: 600; }
+.badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid #cfc6b6; }
+.high { background: #e8f4ea; }
+.medium { background: #f4eed8; }
+.low { background: #f6e6d8; }
+.reject { background: #f3d9d6; }
+.muted { color: #5c564c; font-size: 13px; }
+pre, .mono { font-family: ui-monospace, Consolas, monospace; white-space: pre-wrap; font-size: 13px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.fact { border-left: 3px solid #215c38; padding: 8px 12px; margin: 8px 0; background: #f3f8f4; }
+.inference { border-left: 3px solid #8a6a24; padding: 8px 12px; margin: 8px 0; background: #f8f4e8; }
