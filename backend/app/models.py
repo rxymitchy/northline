@@ -23,11 +23,24 @@ class ResearchRun(Base):
     qualified_count: Mapped[int] = mapped_column(Integer, default=0)
     rejected_count: Mapped[int] = mapped_column(Integer, default=0)
     estimated_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    kind: Mapped[str] = mapped_column(String(40), default="outbound")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     companies: Mapped[list["Company"]] = relationship(back_populates="run")
     logs: Mapped[list["EventLog"]] = relationship(back_populates="run")
+
+
+class Inquiry(Base):
+    __tablename__ = "inquiries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("research_runs.id"), nullable=True)
+    name: Mapped[str] = mapped_column(String(200))
+    email: Mapped[str] = mapped_column(String(200))
+    source_kind: Mapped[str] = mapped_column(String(40))
+    source_value: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class Company(Base):
@@ -83,7 +96,7 @@ class Contact(Base):
     phone: Mapped[str | None] = mapped_column(String(80), nullable=True)
     linkedin: Mapped[str | None] = mapped_column(String(400), nullable=True)
     verified: Mapped[bool] = mapped_column(Boolean, default=False)
-    verification_note: Mapped[str] = mapped_column(String(80), default="CONTACT NOT VERIFIED")
+    verification_note: Mapped[str] = mapped_column(Text, default="CONTACT NOT VERIFIED")
     source_url: Mapped[str | None] = mapped_column(String(800), nullable=True)
     rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
 

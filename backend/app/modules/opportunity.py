@@ -40,9 +40,13 @@ Return JSON:
 """
 
 
-def detect_opportunity(run_id: int, company: dict, research: dict, parsed_icp: dict) -> dict:
+def detect_opportunity(run_id: int, company: dict, research: dict, parsed_icp: dict, use_llm: bool = True) -> dict:
     track = company.get("track") or "operational_pain"
     heuristic = detect_automation_gap(research, track)
+    if not use_llm:
+        data = _heuristic_opportunity(heuristic, track)
+        data["heuristic_gap"] = heuristic
+        return data
     user = json.dumps(
         {
             "icp": {
@@ -105,3 +109,19 @@ def detect_opportunity(run_id: int, company: dict, research: dict, parsed_icp: d
         data["automation_gap"] = data.get("automation_gap") or heuristic["summary"]
 
     return data
+
+
+def _heuristic_opportunity(heuristic: dict, track: str) -> dict:
+    return {
+        "qualify": bool(heuristic.get("exists")),
+        "confidence": "Medium" if heuristic.get("exists") else "Low",
+        "facts": [{"observation": f} for f in (heuristic.get("facts") or [])],
+        "inferences": [],
+        "evidence": heuristic.get("facts") or [],
+        "observed_problem": heuristic.get("summary"),
+        "automation_gap": heuristic.get("summary"),
+        "automation_opportunity": heuristic.get("summary"),
+        "recommended_offer": "Automation against the public process gap" if heuristic.get("exists") else "None",
+        "track": track,
+        "reject_reason": None if heuristic.get("exists") else "No grounded automation gap on the public pages",
+    }

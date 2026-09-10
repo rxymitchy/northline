@@ -63,6 +63,13 @@ PUBLISHER_DOMAINS = {
     "originlab.com",
     "crunchbase.com",
     "zoominfo.com",
+    "blogspot.com",
+    "blogger.com",
+    "wordpress.com",
+    "tumblr.com",
+    "ghost.io",
+    "hashnode.dev",
+    "hashnode.com",
 }
 
 # Hosts whose job is ranking/writing about other companies
@@ -142,6 +149,12 @@ ABOUT_OTHER_COMPANIES = (
     "last updated",
     "updated on",
     "roundup",
+    "leave a comment",
+    "posted on",
+    "posted in",
+    "subscribe to the blog",
+    "latest posts",
+    "related posts",
 )
 
 FIRST_PERSON_COMPANY = (
@@ -164,6 +177,8 @@ def host_of(url: str) -> str:
 
 def is_publisher_host(host: str) -> bool:
     host = (host or "").lower().replace("www.", "")
+    if host.startswith("blog.") or host.startswith("blogs."):
+        return True
     if any(host == d or host.endswith("." + d) for d in PUBLISHER_DOMAINS):
         return True
     return any(bit in host for bit in LISTING_HOST_BITS)
@@ -189,13 +204,15 @@ def is_editorial_name(name: str) -> bool:
 def should_skip_search_result(url: str, title: str, snippet: str = "") -> str | None:
     """Skip pages that are about companies, not the company itself."""
     host = host_of(url)
-    blob = f"{title} {snippet}".lower()
+    blob = f"{title} {snippet} {url}".lower()
     if is_publisher_host(host):
         return f"Third-party article/listing site ({host}), not the company's own website"
-    if is_listing_path(url) and LISTICLE_TITLE.search(title or blob):
-        return "URL is a ranking/list article about companies, not a company homepage"
+    if is_listing_path(url) and (LISTICLE_TITLE.search(title or blob) or "/blog/" in url.lower() or "/news/" in url.lower()):
+        return "URL is a ranking/list/blog article, not a company homepage"
     if is_editorial_name(title or ""):
         return f"Search title is editorial ('{title[:80]}'), not a company name"
+    if re.search(r"\b(blog|listicle|roundup)\b", title or "", re.I) and not any(p in blob for p in FIRST_PERSON_COMPANY):
+        return "Search result is a blog or article, not a company"
     about_hits = sum(1 for p in ABOUT_OTHER_COMPANIES if p in blob)
     if about_hits >= 2:
         return "Snippet describes a roundup/article about agencies, not one company"
@@ -222,6 +239,38 @@ def not_a_company_site_reason(title: str, text: str, url: str, html_sample: str 
 
 def looks_like_article_page(title: str, text: str, url: str, html_sample: str = "") -> bool:
     return not_a_company_site_reason(title, text, url, html_sample) is not None
+
+
+def looks_like_operating_company(title: str, text: str, url: str, html_sample: str = "") -> bool:
+    """True when the page reads as a business homepage, not a blog or magazine."""
+    if not_a_company_site_reason(title, text, url, html_sample):
+        return False
+    low = f"{title}\n{text[:5000]}\n{html_sample[:1500]}".lower()
+    first_person = sum(1 for p in FIRST_PERSON_COMPANY if p in low)
+    ops = (
+        "opening hours",
+        "our location",
+        "call us",
+        "whatsapp",
+        "limited",
+        "ltd",
+        "llc",
+        "services",
+        "book now",
+        "book online",
+        "get a quote",
+        "privacy policy",
+        "terms of service",
+    )
+    op_hits = sum(1 for p in ops if p in low)
+    bloggy = sum(
+        1
+        for p in ("leave a comment", "related posts", "posted on", "min read", "subscribe to")
+        if p in low
+    )
+    if bloggy >= 2 and first_person < 2:
+        return False
+    return first_person >= 1 or op_hits >= 2
 
 
 def homepage_from_article_path(url: str) -> str:

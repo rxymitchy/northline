@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import SessionLocal
+from app.emailer import send_email, sending_outbound_allowed
 from app.logging_util import log_event
 from app.models import ApiUsage, Company, Contact, Opportunity, Outreach, ResearchRun
 from app.modules.cheap_filter import cheap_filter
@@ -292,8 +293,7 @@ def _research_one(db: Session, run: ResearchRun, company: Company, parsed: dict)
     company.status = "qualified"
     if scoring["lead_score"] >= 40:
         draft = write_outreach(run.id, cand, opportunity, contact_data)
-        db.add(
-            Outreach(
+        outreach_row = Outreach(
                 company_id=company.id,
                 contact_id=contact.id,
                 subject=draft.get("subject") or "",
@@ -301,15 +301,48 @@ def _research_one(db: Session, run: ResearchRun, company: Company, parsed: dict)
                 pitch_rationale=draft.get("pitch_rationale") or "",
                 status="draft",
             )
-        )
+        db.add(outreach_row)
         company.status = "outreach_drafted"
         notes["decision"] = (
-            f"Approved for a draft (not sent). Score {scoring['lead_score']}. "
+            f"Qualified from a public automation gap. Score {scoring['lead_score']}. "
             f"{scoring.get('why')} Track={opportunity.get('track') or cand.get('track')}."
         )
         company.research_notes = json.dumps(notes)
+        db.commit()
+        _maybe_send_outbound(db, run, company, contact, outreach_row)
     db.commit()
     log_event(run.id, "qualified", f"{company.name} scored {scoring['lead_score']}")
+
+
+def _maybe_send_outbound(db, run: ResearchRun, company: Company, contact: Contact, outreach_row: Outreach) -> None:
+    email = (contact.email or "").strip()
+    note = (contact.verification_note or "").lower()
+    if not sending_outbound_allowed():
+        log_event(run.id, "email_skipped", "Outbound sending is off or SMTP is not configured.")
+        return
+    if "@" not in email or "not found" in email.lower() or "not verified" in note:
+        log_event(run.id, "email_skipped", f"{company.name}: no verified public email (never invented)")
+        return
+    time.sleep(settings.outbound_send_delay_seconds)
+    result = send_email(email, outreach_row.subject, outreach_row.body)
+    if result.get("sent"):
+        outreach_row.status = "sent"
+        outreach_row.date_contacted = datetime.now(timezone.utc)
+        company.status = "emailed"
+        company.date_contacted = outreach_row.date_contacted
+        notes = {}
+        try:
+            notes = json.loads(company.research_notes or "{}")
+            if not isinstance(notes, dict):
+                notes = {}
+        except Exception:
+            notes = {}
+        notes["decision"] = f"Emailed public contact {email}. {result.get('reason')}"
+        company.research_notes = json.dumps(notes)
+        db.commit()
+        log_event(run.id, "email_sent", f"{company.name} → {email}")
+    else:
+        log_event(run.id, "email_failed", f"{company.name}: {result.get('reason')}", level="warning")
 
 
 def _filled(value: str | None, fallback: str) -> str:

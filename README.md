@@ -1,29 +1,28 @@
-# Find Clients Agent
+# Northline
 
-Open-source personal outbound prospecting agent. It finds businesses (Kenya/Nairobi first) with **observable automation gaps**, researches public evidence, scores fit, drafts human emails, and waits for your approval. It does **not** auto-send email.
+**Manual work is quietly ruining the company.**
+
+Northline looks at how a business actually takes work in — website, social profile, spreadsheet, or a short description — and says what still depends on a person. It is not a generic lead scraper.
+
+Public app: paste how you work, get a snapshot, email or download the full report, then optionally see **real companies** (not blogs or roundups) that are further along. Those companies are written into the report when you download or email it again.
+
+A PIN-locked **admin** hunt still finds other businesses with public automation gaps and drafts outreach to **public** emails only. Never invented contacts.
 
 **Contributions are welcome.** If something is broken or clumsy, open an issue or a pull request. See [CONTRIBUTING.md](CONTRIBUTING.md). Licensed under [MIT](LICENSE).
 
-The goal is not a generic lead scraper. The goal is: **companies showing evidence of operational pain you can actually automate.**
+## What visitors get
 
-## Architecture
+1. Choose **Website**, **Social media**, **Data file / CSV**, or **Describe how you work**.
+2. Add name and email, then **Search**.
+3. On-page snapshot: what looks manual, a comment on *that* channel, extra suggestions (including other apps when you start from social), and what to automate first.
+4. **Email me the full report** (normal SMTP, not Outlook). If mail is not connected, **Download the full report**.
+5. **See similar companies doing it right** — homepages of operating businesses, then download/email again so they are in the file.
 
-```
-ICP text
-  → ICP parser (OpenAI, heuristic fallback if the API is down/out of credits)
-  → Discovery (pluggable search: DuckDuckGo / Tavily / Serper / Brave)
-  → Deduplicate by domain/name
-  → Drop news/listicles/review sites (keep official company sites)
-  → Cheap filter
-  → Deep research (public HTML)
-  → Literal automation-gap detection (WhatsApp, call-to-book, agency overflow, …)
-  → Contact finder (public email + phone only; never invented)
-  → Score 0–100
-  → Outreach draft for qualified prospects
-  → Dashboard approve/reject + CSV
-```
+Visitor search stays fast: homepage only, no public contact hunt, no OpenAI on that path.
 
-Python modules: `backend/app/modules/`. Search providers: `backend/app/providers/`. SQLite stores companies, contacts, opportunities, outreach, runs, logs, and API usage.
+## Admin hunt
+
+Lock icon on the public page → admin dashboard. Pipeline: search → drop publishers/listicles → public HTML research → gap detection → public contacts only → score → optional SMTP cold send when enabled.
 
 ## Setup
 
@@ -33,51 +32,41 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 copy ..\.env.example .env
-# edit .env and set OPENAI_API_KEY (needs API billing credits, not ChatGPT Plus)
-uvicorn app.main:app --reload --port 8000
+# edit .env — SMTP if you want report emails; OPENAI_API_KEY only for admin LLM drafts
+py -3.13 -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Open **http://localhost:8000**.
+Open **http://127.0.0.1:8000**.
 
-Optional Next.js UI is in `frontend/` and talks to the same API.
+Use **Python 3.13** (or any version with the packages in `requirements.txt` installed). On Windows, antivirus HTTPS scanning can block Python SSL; fetches go through a stack that usually still works.
 
-On Windows, Avast/antivirus HTTPS scanning can block Python SSL. This project fetches via a stack that usually still works. If OpenAI has **no API credits**, ICP/outreach fall back to heuristics until you top up billing.
+An older Next.js dashboard lives in `frontend/` and talks to the same API. The product UI is the FastAPI pages in `backend/app/static/`.
 
 ## Environment
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `OPENAI_API_KEY` | For AI drafts | ICP parse, research reasoning, outreach |
-| `OPENAI_MODEL` | No | Default `gpt-4o-mini` |
+| `SMTP_HOST` / `SMTP_FROM_EMAIL` / `SMTP_PASSWORD` | To send mail | Visitor reports and (if enabled) outbound |
+| `SMTP_PORT` / `SMTP_USE_TLS` | No | Default `587` + TLS |
+| `EMAIL_SENDING_ENABLED` / `OUTBOUND_SEND_ENABLED` | Keep `false` until SMTP works | Cold emails to public contacts |
+| `ADMIN_PIN` | For `/admin` | Unlock the hunt dashboard |
+| `OPENAI_API_KEY` | For AI drafts | Admin ICP/outreach; visitor search does not need it |
 | `SEARCH_PROVIDER` | No | `duckduckgo` (free), `tavily`, `serper`, or `brave` |
 | `TAVILY_API_KEY` / `SERPER_API_KEY` / `BRAVE_API_KEY` | If you switch provider | Search APIs |
-| `MAX_DISCOVER` / `MAX_DEEP_RESEARCH` / `MAX_OUTREACH` | No | Funnel caps |
-| `EMAIL_SENDING_ENABLED` | Keep `false` | Sending is not implemented |
 
 Never commit `.env`. Copy `.env.example` only.
 
-## Database (SQLite)
+## Layout
 
-`research_runs`, `companies`, `contacts`, `opportunities`, `outreach`, `event_logs`, `api_usage`.
+Python modules: `backend/app/modules/`. Search providers: `backend/app/providers/`. SQLite (`backend/data/`, gitignored) stores runs, companies, contacts, opportunities, outreach, inquiries, and logs.
 
 ## Known limitations
 
 - Public HTML only. No login, CAPTCHA, paywall, or ToS bypass.
-- Decision-maker emails/phones are often missing; marked **CONTACT NOT VERIFIED**. Never fabricated.
-- DuckDuckGo is noisy; listicles are filtered but some still slip through.
-- Heuristic scoring is rule-based; LLM scoring needs API credits.
-- Follow-up sending is disabled on purpose.
-
-## Cost (rough)
-
-A small Nairobi run (discover ~25, research ~10–20, a handful of drafts) is typically well under **$0.10** on `gpt-4o-mini`, plus $0 if you use DuckDuckGo.
-
-## Next improvements
-
-1. Kenya directory adapters that extract official websites.
-2. Optional send via a provider you control, still one-click approve.
-3. Learn from good/bad feedback which gaps actually convert.
+- Similar companies are filtered to operating sites; thin or blocked pages may be skipped.
+- Decision-maker emails are often missing on the admin hunt; marked **CONTACT NOT VERIFIED**. Never fabricated.
+- If SMTP is empty, reports still show on the page and can be downloaded.
 
 ## Compliance
 
-Respect robots.txt, site terms, API limits, privacy law, and email rules. This tool drafts research-backed outreach for a human to send.
+Respect robots.txt, site terms, API limits, privacy law, and email rules. This tool drafts research from public pages for a human to send.
