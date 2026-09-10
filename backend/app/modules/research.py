@@ -37,14 +37,15 @@ SIGNAL_PATTERNS = {
 _robots_cache: dict[str, RobotFileParser | None] = {}
 
 
-def research_company(run_id: int, company: dict) -> dict:
+def research_company(run_id: int, company: dict, quick: bool = False) -> dict:
     start_url = company.get("website") or company.get("source_url")
     if not start_url:
         return {"ok": False, "reason": "No URL to research"}
 
+    timeout = 8 if quick else settings.fetch_timeout_seconds
     pages: list[dict] = []
     try:
-        homepage = _fetch_page(start_url)
+        homepage = _fetch_page(start_url, timeout=timeout, skip_robots=quick)
     except Exception as exc:
         log_event(run_id, "fetch_error", f"Failed to fetch {start_url}: {exc}", level="warning")
         return {"ok": False, "reason": str(exc)}
@@ -52,26 +53,30 @@ def research_company(run_id: int, company: dict) -> dict:
     if not homepage:
         return {"ok": False, "reason": f"Blocked or empty: {start_url}"}
 
-    article_reason = not_a_company_site_reason(
-        homepage.get("title") or "",
-        homepage.get("text") or "",
-        homepage.get("url") or start_url,
-        homepage.get("html_sample") or "",
-    )
-    if article_reason:
-        return {"ok": False, "reason": article_reason}
+    if not quick:
+        article_reason = not_a_company_site_reason(
+            homepage.get("title") or "",
+            homepage.get("text") or "",
+            homepage.get("url") or start_url,
+            homepage.get("html_sample") or "",
+        )
+        if article_reason:
+            return {"ok": False, "reason": article_reason}
 
     pages.append(homepage)
     website = company.get("website") or _origin(homepage["url"])
-    extra_urls = _candidate_paths(homepage, website)
+    extra_urls = [] if quick else _candidate_paths(homepage, website)
     for url in extra_urls:
-        time.sleep(settings.fetch_delay_seconds)
+        if not quick:
+            time.sleep(settings.fetch_delay_seconds)
         try:
-            page = _fetch_page(url)
+            page = _fetch_page(url, timeout=timeout, skip_robots=quick)
             if page:
                 pages.append(page)
         except Exception as exc:
             log_event(run_id, "fetch_error", f"Failed to fetch {url}: {exc}", level="warning")
+            if quick:
+                break
 
     combined_text = "\n\n".join(p["text"] for p in pages)[:14000]
     combined_html = "\n".join(p.get("html_sample", "") for p in pages)
@@ -88,7 +93,10 @@ def research_company(run_id: int, company: dict) -> dict:
                 phones.append(_clean_phone("+" + m.group(1) if not m.group(1).startswith("0") else m.group(1)))
         phones = _unique(phones)
     people = sum((p["people"] for p in pages), [])
-    resolved_website = _maybe_resolve_directory(homepage, company)
+    if not quick:
+        resolved_website = _maybe_resolve_directory(homepage, company)
+    else:
+        resolved_website = website
 
     return {
         "ok": True,
@@ -105,14 +113,15 @@ def research_company(run_id: int, company: dict) -> dict:
     }
 
 
-def _fetch_page(url: str) -> dict | None:
-    if not _allowed(url):
+def _fetch_page(url: str, timeout: int | None = None, skip_robots: bool = False) -> dict | None:
+    if not skip_robots and not _allowed(url):
         return None
+    wait = timeout if timeout is not None else settings.fetch_timeout_seconds
     try:
-        response = http_get(url, timeout=settings.fetch_timeout_seconds)
+        response = http_get(url, timeout=wait)
     except Exception as exc:
         if "aswMonFltProxy" in str(exc) or getattr(exc, "errno", None) == 13:
-            response = http_get(url, timeout=settings.fetch_timeout_seconds)
+            response = http_get(url, timeout=wait)
         else:
             raise
     status = getattr(response, "status_code", 0)

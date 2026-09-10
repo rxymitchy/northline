@@ -26,8 +26,17 @@ class Settings(BaseSettings):
     backend_port: int = 8000
     cors_origins: str = "http://localhost:3000"
     email_sending_enabled: bool = False
+    outbound_send_enabled: bool = False
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
+    smtp_from_name: str = "Northline"
+    smtp_use_tls: bool = True
+    outbound_send_delay_seconds: float = 4.0
 
-    # Approximate USD per 1M tokens for cost logging (gpt-4o-mini defaults)
+    admin_pin: str = "northline"
     openai_input_cost_per_1m: float = 0.15
     openai_output_cost_per_1m: float = 0.60
 

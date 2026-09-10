@@ -3,249 +3,270 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Find Clients Agent</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>Northline</title>
   <style>
     :root {
-      --bg: #0b1020;
-      --panel: #12182b;
-      --panel2: #171e35;
-      --line: #2a3354;
-      --text: #e8edf8;
-      --muted: #93a0c2;
-      --accent: #5b8cff;
-      --good: #3dd68c;
-      --bad: #ff6b7a;
-      --warn: #f5c15c;
+      --bg: #fafbfc;
+      --ink: #111827;
+      --mute: #6b7280;
+      --line: #e5e7eb;
+      --blue: #2563eb;
+      --blue-hover: #1d4ed8;
+      --card: #fff;
     }
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--text); font-family: "IBM Plex Sans", system-ui, sans-serif; }
-    a { color: var(--accent); text-decoration: none; }
-    .app { display: grid; grid-template-columns: 320px 1fr; min-height: 100vh; }
-    .side { border-right: 1px solid var(--line); padding: 22px 18px; background: #0e1426; }
-    .brand { font-weight: 700; letter-spacing: -.02em; font-size: 18px; }
-    .brand span { color: var(--accent); }
-    .muted { color: var(--muted); font-size: 13px; line-height: 1.45; }
-    .main { padding: 22px 26px 80px; }
-    h1 { font-size: 22px; margin: 0 0 6px; }
-    h2 { font-size: 15px; margin: 0 0 10px; font-weight: 600; }
-    textarea, input { width: 100%; background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: inherit; }
-    textarea { min-height: 210px; resize: vertical; }
-    button { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer; background: var(--accent); color: #fff; }
-    button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
-    button.good { background: #1f8a58; }
-    button.bad { background: #b4233a; }
-    .health { margin: 12px 0 16px; padding: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
-    .run-item { padding: 10px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; background: var(--panel); cursor: pointer; }
-    .run-item:hover { border-color: var(--accent); }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding: 8px 8px; border-bottom: 1px solid var(--line); }
-    td { padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
-    tr:hover td { background: #151c32; cursor: pointer; }
-    .pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 99px; background: #243056; }
-    .pill.high { background: #163d2e; color: var(--good); }
-    .pill.mid { background: #3d3216; color: var(--warn); }
-    .pill.low { background: #3d1d24; color: var(--bad); }
-    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    @media (max-width: 980px) { .app { grid-template-columns: 1fr; } .grid { grid-template-columns: 1fr; } .side { border-right: 0; border-bottom: 1px solid var(--line); } }
-    .fact { background: #132a22; border-left: 3px solid var(--good); padding: 10px 12px; margin: 8px 0; border-radius: 0 10px 10px 0; }
-    .inf { background: #2a2414; border-left: 3px solid var(--warn); padding: 10px 12px; margin: 8px 0; border-radius: 0 10px 10px 0; }
-    .kv { display: grid; grid-template-columns: 160px 1fr; gap: 8px 12px; font-size: 13px; }
-    .kv b { color: var(--muted); font-weight: 500; }
-    pre { white-space: pre-wrap; font-family: ui-monospace, Consolas, monospace; font-size: 13px; background: #0b1020; padding: 12px; border-radius: 10px; }
-    .hidden { display: none; }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-    .why { background: #1a2240; padding: 12px; border-radius: 10px; font-size: 13px; line-height: 1.5; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 16px/1.5 ui-sans-serif, system-ui, Segoe UI, sans-serif; }
+    .page { max-width: 640px; margin: 0 auto; padding: 10vh 20px 80px; }
+    h1 { font-size: clamp(26px, 4vw, 34px); font-weight: 650; letter-spacing: -.03em; line-height: 1.25; margin: 0 0 10px; text-align: center; }
+    .brand { text-align: center; font-size: 13px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--blue); margin: 0 0 16px; }
+    .slogan { text-align: center; color: var(--mute); margin: 0 0 28px; font-size: 15px; }
+    .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+    .choice {
+      border: 1px solid var(--line);
+      background: var(--card);
+      border-radius: 12px;
+      padding: 14px 12px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .choice:hover, .choice.on { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    label { display: block; font-size: 13px; color: var(--mute); margin: 12px 0 6px; }
+    input, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font: inherit;
+      background: #fff;
+    }
+    textarea { min-height: 120px; resize: vertical; }
+    input:focus, textarea:focus { outline: 2px solid rgba(37,99,235,.35); border-color: var(--blue); }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 44px; padding: 0 22px; border-radius: 10px; border: 0;
+      font: 600 15px/1 inherit; cursor: pointer;
+    }
+    .btn.primary { background: var(--blue); color: #fff; width: 100%; margin-top: 18px; }
+    .btn.primary:hover { background: var(--blue-hover); }
+    .btn.primary:disabled { opacity: .5; cursor: default; }
+    .btn.ghost { background: #fff; color: var(--blue); border: 1px solid var(--blue); width: 100%; margin-top: 12px; }
+    .err { color: #b91c1c; font-size: 14px; text-align: center; min-height: 20px; margin-top: 10px; }
+    .hidden { display: none !important; }
+    .stage { text-align: center; color: var(--mute); margin: 24px 0; }
+    .cards { display: flex; flex-direction: column; gap: 14px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px 18px 16px; }
+    .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--mute); margin: 0 0 8px; font-weight: 700; }
+    .card p { margin: 0; }
+    .card ul { margin: 0; padding-left: 18px; }
+    .card li { margin: 6px 0; }
+    .peer { display: block; padding: 12px 0; border-top: 1px solid var(--line); text-decoration: none; color: inherit; }
+    .peer:first-child { border-top: 0; }
+    .peer b { color: var(--blue); }
+    .peer span { display: block; color: var(--mute); font-size: 13px; margin-top: 4px; }
+    .lock {
+      position: fixed; left: 14px; bottom: 14px; width: 36px; height: 36px;
+      border-radius: 10px; border: 1px solid var(--line); background: #fff;
+      cursor: pointer; color: var(--mute); font-size: 16px;
+    }
+    .note { text-align: center; color: var(--mute); font-size: 14px; margin-top: 10px; }
   </style>
 </head>
 <body>
-  <div class="app">
-    <aside class="side">
-      <div class="brand">Find <span>Clients</span> Agent</div>
-      <p class="muted">Agencies first, then software shops, then messy operations. Drafts only — nothing sends.</p>
-      <div class="health muted" id="health">Checking API…</div>
-      <h2>New run</h2>
-      <textarea id="icp">Find paying work in Nairobi/Kenya across THREE priorities — not only real estate.
-
-Priority 1: Digital/marketing/web agencies. Ask if clients need technical work beyond their team; offer contract overflow engineering.
-
-Named agencies: Bluegift Digital; Iconic Digital; Digitally Freed Africa; Nairobi Marketing; Nevin Digital; Netlit Digital; Windand Developers; Origin Digital Agency; Kissor Digital; Pinch Africa.
-
-Priority 2: Software/AI companies as a contract engineer (Glitex, Grafame, Automatech, Isoftke, Cloudwise, Codevant, CraftDuka, Ifriki, Afrinetix…).
-
-Priority 3: Real estate, clinics, schools, travel, salons, events, ecommerce with messy public processes.
-
-Skip news articles and listicles. Find official websites and public decision-maker emails only.</textarea>
-      <div class="row"><button onclick="startRun()">Run prospecting</button></div>
-      <p class="muted" id="homeErr"></p>
-      <h2 style="margin-top:22px">Runs</h2>
-      <div id="runs"></div>
-    </aside>
-    <main class="main">
-      <div id="home">
-        <h1>Prospects</h1>
-        <p class="muted">Pick a run on the left, or start one. Articles and publisher sites are discarded. Empty fields should not appear — you will see why something was skipped.</p>
-        <div class="card muted">No run selected yet.</div>
+  <div class="page">
+    <form id="form">
+      <p class="brand">Northline</p>
+      <h1>Manual work is quietly ruining the company</h1>
+      <p class="slogan">Show us the website, the socials, a file, or describe the process.</p>
+      <div class="choices">
+        <button type="button" class="choice on" data-source="website">Website</button>
+        <button type="button" class="choice" data-source="social">Social media</button>
+        <button type="button" class="choice" data-source="csv">Data file / CSV</button>
+        <button type="button" class="choice" data-source="describe">Describe how you work</button>
       </div>
-      <div id="runView" class="hidden">
-        <h1 id="runTitle">Run</h1>
-        <p class="muted" id="runIcp"></p>
-        <div class="card" id="runMeta"></div>
-        <div class="card" style="overflow:auto">
-          <h2>Discovered companies</h2>
-          <div id="runTable"></div>
-        </div>
-        <div class="card">
-          <h2>Run log</h2>
-          <div id="runLogs" class="muted"></div>
-        </div>
+      <div id="urlWrap">
+        <label id="urlLabel" for="url">Website</label>
+        <input id="url" type="url" placeholder="https://" />
       </div>
-      <div id="detailView" class="hidden">
-        <p><a href="#" id="backRun">← Back to run</a></p>
-        <div id="detail"></div>
+      <div id="fileWrap" class="hidden">
+        <label for="file">CSV or export</label>
+        <input id="file" type="file" accept=".csv,text/csv,text/plain" />
       </div>
-    </main>
+      <div id="descWrap" class="hidden">
+        <label for="description">How work moves today</label>
+        <textarea id="description" placeholder="Who takes the lead, where it lives (WhatsApp, Excel, inbox), what you do by hand…"></textarea>
+      </div>
+      <label for="name">Your name</label>
+      <input id="name" type="text" autocomplete="name" required />
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="email" required />
+      <button class="btn primary" id="searchBtn" type="submit">Search</button>
+      <p class="err" id="err"></p>
+    </form>
+
+    <div id="live" class="hidden">
+      <p class="stage" id="stage">Looking at how you work. This usually takes under a minute…</p>
+      <div id="results" class="cards hidden"></div>
+      <button class="btn primary hidden" id="emailBtn" type="button">Email me the full report</button>
+      <button class="btn ghost hidden" id="downloadBtn" type="button">Download the full report</button>
+      <button class="btn ghost hidden" id="betterBtn" type="button">See similar companies doing it right</button>
+      <div id="peers" class="card hidden" style="margin-top:16px"></div>
+      <p class="note" id="note"></p>
+    </div>
   </div>
+  <button class="lock" type="button" title="Admin" onclick="openAdmin()">🔒</button>
 <script>
-const API = "";
-let currentRun = null;
-let pollTimer = null;
-function nz(v, fb){ if(v===null||v===undefined||v==="") return fb||"Not found on public pages"; return v; }
-async function j(path, opts){
-  const r = await fetch(API + path, Object.assign({headers:{"Content-Type":"application/json"}}, opts||{}));
-  if(!r.ok) throw new Error(await r.text());
-  return r.json();
+let source = "website";
+let runId = null;
+let poll = null;
+document.querySelectorAll(".choice").forEach(btn => {
+  btn.onclick = () => {
+    source = btn.dataset.source;
+    document.querySelectorAll(".choice").forEach(b => b.classList.toggle("on", b===btn));
+    document.getElementById("urlWrap").classList.toggle("hidden", source==="csv" || source==="describe");
+    document.getElementById("fileWrap").classList.toggle("hidden", source!=="csv");
+    document.getElementById("descWrap").classList.toggle("hidden", source!=="describe" && source!=="csv");
+    document.getElementById("urlLabel").textContent = source==="social" ? "Social profile link" : "Website";
+  };
+});
+document.getElementById("form").onsubmit = async (e) => {
+  e.preventDefault();
+  const err = document.getElementById("err");
+  err.textContent = "";
+  const fd = new FormData();
+  fd.append("name", document.getElementById("name").value.trim());
+  fd.append("email", document.getElementById("email").value.trim());
+  fd.append("source", source);
+  fd.append("url", document.getElementById("url").value.trim());
+  fd.append("description", document.getElementById("description").value.trim());
+  const file = document.getElementById("file").files[0];
+  if (file) fd.append("file", file);
+  document.getElementById("searchBtn").disabled = true;
+  try {
+    const r = await fetch("/api/search", {method:"POST", body: fd});
+    const data = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(typeof data.detail==="string" ? data.detail : "Could not start");
+    runId = data.id;
+    document.getElementById("form").classList.add("hidden");
+    document.getElementById("live").classList.remove("hidden");
+    document.getElementById("stage").textContent = "Looking at how you work. This usually takes under a minute…";
+    watch();
+  } catch (ex) {
+    err.textContent = ex.message;
+    document.getElementById("searchBtn").disabled = false;
+  }
+};
+function watch(){
+  if (poll) clearInterval(poll);
+  const tick = async () => {
+    const r = await fetch("/api/runs/"+runId);
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.status==="completed") {
+      document.getElementById("stage").textContent = "Your snapshot";
+    } else {
+      const p = d.progress || "Looking at how you work.";
+      document.getElementById("stage").textContent = p.toLowerCase().includes("minute") ? p : (p + " This usually takes under a minute…");
+    }
+    if (d.result && d.status==="completed") {
+      renderResult(d.result);
+      clearInterval(poll);
+    }
+    if (d.status==="failed") {
+      document.getElementById("stage").textContent = "Could not finish";
+      document.getElementById("note").textContent = d.error || "Try another option.";
+      clearInterval(poll);
+    }
+  };
+  tick();
+  poll = setInterval(tick, 1500);
 }
-function show(id){ ["home","runView","detailView"].forEach(x => document.getElementById(x).classList.toggle("hidden", x!==id)); }
-function scoreClass(s){ if(s==null) return "pill"; if(s>=80) return "pill high"; if(s>=60) return "pill mid"; return "pill low"; }
-async function loadHome(){
-  try{
-    const h = await j("/api/health");
-    document.getElementById("health").innerHTML = `Search <b>${h.search_provider}</b><br>OpenAI ${h.openai_configured?"ready":"missing key"}<br>Sending off`;
-    const runs = await j("/api/runs");
-    document.getElementById("runs").innerHTML = runs.length ? runs.map(r=>`<div class="run-item" onclick="openRun(${r.id})"><b>Run ${r.id}</b> · ${r.status}<div class="muted">${esc((r.icp_text||"").slice(0,90))}</div><div class="muted">${r.discovered_count} found · ${r.qualified_count} qualified</div></div>`).join("") : "<p class='muted'>No runs yet.</p>";
-  }catch(e){ document.getElementById("homeErr").textContent = e.message; }
+function renderResult(res){
+  const facts = (res.facts||[]).filter(Boolean);
+  const gaps = (res.gaps||[]).filter(Boolean);
+  const ch = res.channel || {};
+  const missing = (ch.missing||[]).filter(Boolean);
+  const explore = (ch.explore||[]).filter(Boolean);
+  const src = res.source || source;
+  const commentTitle = {
+    website: "Comment on your website",
+    social: "Comment on this profile",
+    csv: "Comment on this file",
+    describe: "Comment on how you work"
+  }[src] || "Comment on what you sent";
+  const extraTitle = src === "social" ? "Other apps and extra suggestions" : "Extra suggestions";
+  document.getElementById("results").classList.remove("hidden");
+  document.getElementById("results").innerHTML = `
+    <div class="card"><h2>What looks manual</h2><p>${esc(res.observed || "We could not see a clear public process yet.")}</p></div>
+    <div class="card"><h2>${esc(commentTitle)}</h2><p>${esc(ch.state || "We read what you sent and mapped the process we could see.")}</p>
+      ${missing.length ? "<p style='margin-top:10px'><b>What’s missing</b></p><ul>"+missing.map(g=>"<li>"+esc(g)+"</li>").join("")+"</ul>" : ""}
+      ${explore.length ? "<p style='margin-top:10px'><b>"+esc(extraTitle)+"</b></p><ul>"+explore.map(g=>"<li>"+esc(g)+"</li>").join("")+"</ul>" : ""}</div>
+    <div class="card"><h2>Where time is leaking</h2>${gaps.length ? "<ul>"+gaps.map(g=>"<li>"+esc(g)+"</li>").join("")+"</ul>" : "<p>No strong public gap — the report still captures what we saw.</p>"}</div>
+    <div class="card"><h2>What we would automate first</h2><p>${esc(res.offer || "The hand-offs that still wait on a person.")}</p>
+      ${facts.length ? "<ul>"+facts.map(f=>"<li>"+esc(f)+"</li>").join("")+"</ul>" : ""}</div>`;
+  document.getElementById("emailBtn").classList.remove("hidden");
+  document.getElementById("emailBtn").onclick = emailReport;
+  document.getElementById("downloadBtn").classList.remove("hidden");
+  document.getElementById("downloadBtn").onclick = downloadReport;
+  document.getElementById("betterBtn").classList.remove("hidden");
+  document.getElementById("betterBtn").onclick = findBetter;
 }
-async function startRun(){
-  document.getElementById("homeErr").textContent = "";
-  try{
-    const run = await j("/api/runs", {method:"POST", body: JSON.stringify({icp: document.getElementById("icp").value})});
-    openRun(run.id);
-  }catch(e){ document.getElementById("homeErr").textContent = e.message; }
+async function emailReport(){
+  const btn = document.getElementById("emailBtn");
+  btn.disabled = true;
+  document.getElementById("note").textContent = "";
+  try {
+    const r = await fetch("/api/runs/"+runId+"/email", {method:"POST"});
+    const data = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(typeof data.detail==="string" ? data.detail : "Could not send yet");
+    document.getElementById("note").textContent = "Sent. Check your inbox.";
+  } catch (ex) {
+    document.getElementById("note").textContent = ex.message + " Download the full report below if email is not working.";
+    btn.disabled = false;
+  }
 }
-async function openRun(id){
-  currentRun = id;
-  show("runView");
-  await refreshRun();
-  if(pollTimer) clearInterval(pollTimer);
-  pollTimer = setInterval(refreshRun, 3000);
+function downloadReport(){
+  window.location.href = "/api/runs/"+runId+"/report";
 }
-async function refreshRun(){
-  if(!currentRun) return;
-  const data = await j("/api/runs/"+currentRun);
-  const logs = await j("/api/runs/"+currentRun+"/logs");
-  document.getElementById("runTitle").textContent = "Run #"+data.id+" · "+data.status;
-  document.getElementById("runIcp").textContent = data.icp_text;
-  document.getElementById("runMeta").innerHTML = `<div class="kv">
-    <b>Discovered</b><div>${data.discovered_count}</div>
-    <b>Researched</b><div>${data.researched_count}</div>
-    <b>Qualified</b><div>${data.qualified_count}</div>
-    <b>Rejected</b><div>${data.rejected_count}</div>
-    <b>Est. cost</b><div>$${Number(data.estimated_cost_usd||0).toFixed(4)}</div>
-    <b>Error</b><div>${esc(nz(data.error,"None"))}</div>
-  </div>
-  <div class="row"><a href="/api/runs/${data.id}/export.csv"><button class="ghost">Export CSV</button></a></div>`;
-  document.getElementById("runTable").innerHTML = data.companies.length ? `<table><thead><tr><th>Score</th><th>Company</th><th>Track</th><th>Why this outcome</th><th>Status</th></tr></thead><tbody>${
-    data.companies.map(c=>`<tr onclick="openProspect(${c.id})"><td><span class="${scoreClass(c.lead_score)}">${c.lead_score??"—"}</span></td>
-    <td><b>${esc(c.name)}</b><div class="muted">${esc(nz(c.website,"No website"))}</div></td>
-    <td>${esc(nz(c.track,"unclassified"))}</td>
-    <td class="muted">${esc((c.decision_summary||c.observed_problem||"Waiting").slice(0,180))}</td>
-    <td>${esc(c.status)}</td></tr>`).join("")
-  }</tbody></table>` : "<p class='muted'>Waiting for discovery…</p>";
-  document.getElementById("runLogs").innerHTML = logs.length ? logs.map(l=>`[${l.event_type}] ${esc(l.message)}`).join("<br>") : "No log lines yet.";
-  if(["completed","failed"].includes(data.status) && pollTimer){ clearInterval(pollTimer); pollTimer=null; }
+async function findBetter(){
+  const btn = document.getElementById("betterBtn");
+  btn.disabled = true;
+  document.getElementById("stage").textContent = "Finding companies doing better…";
+  await fetch("/api/runs/"+runId+"/better", {method:"POST"});
+  const started = Date.now();
+  const t = setInterval(async () => {
+    const r = await fetch("/api/runs/"+runId);
+    const d = await r.json();
+    const peers = (d.result && d.result.doing_it_right) || [];
+    if (peers.length || Date.now()-started > 45000) {
+      clearInterval(t);
+      document.getElementById("stage").textContent = "Companies doing better";
+      showPeers(peers);
+      btn.disabled = false;
+      if (peers.length) {
+        document.getElementById("note").textContent = "These companies are now in the full report. Download or email it again to keep them.";
+      }
+    }
+  }, 1500);
 }
-async function openProspect(id){
-  if(pollTimer) { clearInterval(pollTimer); pollTimer=null; }
-  const d = await j("/api/prospects/"+id);
-  show("detailView");
-  document.getElementById("backRun").onclick = (e)=>{e.preventDefault(); openRun(d.run_id);};
-  const contact = (d.contacts&&d.contacts[0]) || {};
-  const mail = (d.outreach&&d.outreach[0]) || {};
-  const facts = (d.fact_inference&&d.fact_inference.facts) || [];
-  const inf = (d.fact_inference&&d.fact_inference.inferences) || [];
-  const br = d.score_breakdown || {};
-  const factsHtml = facts.length ? facts.map(f=>`<div class="fact">${esc(typeof f==="string"?f:(f.observation||JSON.stringify(f)))}</div>`).join("") : "<div class='fact'>No facts extracted from the public pages. That is why confidence is limited.</div>";
-  const infHtml = inf.length ? inf.map(f=>`<div class="inf">${esc(typeof f==="string"?f:((f.claim||"")+" — based on: "+(f.based_on||"not specified")))}</div>`).join("") : "<div class='inf'>No inference recorded. The system will not invent an internal problem.</div>";
-  document.getElementById("detail").innerHTML = `
-    <h1>${esc(d.name)}</h1>
-    <p class="muted">${d.website && !String(d.website).startsWith("No ") ? `<a href="${esc(d.website)}" target="_blank">${esc(d.website)}</a>` : esc(nz(d.website,"No website"))} · ${esc(nz(d.location))} · ${esc(nz(d.industry))}</p>
-    <div class="card why"><b>Why this outcome</b><div>${esc(nz(d.decision_summary, br.why || d.observed_problem))}</div></div>
-    <div class="card">
-      <div class="kv">
-        <b>Score</b><div>${nz(d.lead_score,"Not scored")}</div>
-        <b>Confidence</b><div>${esc(nz(d.confidence))}</div>
-        <b>Status</b><div>${esc(d.status)}</div>
-        <b>Track</b><div>${esc(nz(d.track,"unclassified"))}</div>
-        <b>Cheap filter</b><div>${esc(String(d.cheap_filter_score))} — ${esc(nz(d.cheap_filter_reason,"n/a"))}</div>
-      </div>
-      <div class="row">
-        <button class="good" onclick="decide(${d.id},'approve')">Approve draft</button>
-        <button class="bad" onclick="decide(${d.id},'reject')">Reject</button>
-        <button class="ghost" onclick="fb(${d.id},'prospect','good')">Prospect good</button>
-        <button class="ghost" onclick="fb(${d.id},'prospect','bad')">Prospect bad</button>
-        <button class="ghost" onclick="fb(${d.id},'opportunity','good')">Offer good</button>
-        <button class="ghost" onclick="fb(${d.id},'opportunity','bad')">Offer bad</button>
-      </div>
-      <p class="muted" id="dnote">Feedback: ${esc(nz(d.feedback))} · opportunity ${esc(nz(d.opportunity_feedback))}. Sending stays disabled until you enable it later.</p>
-    </div>
-    <div class="grid">
-      <div class="card"><h2>Facts (observed)</h2>${factsHtml}<h2>Inferences (not proven)</h2>${infHtml}</div>
-      <div class="card">
-        <h2>Opportunity</h2>
-        <div class="kv">
-          <b>Observed</b><div>${esc(nz(d.observed_problem))}</div>
-          <b>Automation gap</b><div>${esc(nz((d.fact_inference&&d.fact_inference.automation_gap)||d.observed_problem))}</div>
-          <b>Offer</b><div>${esc(nz(d.automation_opportunity))}</div>
-          <b>Recommended</b><div>${esc(nz(d.recommended_offer))}</div>
-          <b>WhatsApp</b><div>${esc(nz(d.whatsapp))}</div>
-          <b>Description</b><div>${esc(nz(d.description))}</div>
-        </div>
-        <p class="muted">${esc(nz(br.why,"No score explanation stored"))}</p>
-        <pre>${esc(JSON.stringify(br.breakdown||{}, null, 2))}</pre>
-      </div>
-    </div>
-    <div class="card">
-      <h2>Person in charge — email &amp; number to call</h2>
-      <div class="kv">
-        <b>Name</b><div>${esc(nz(contact.name,"Name not found on public pages"))}</div>
-        <b>Role</b><div>${esc(nz(contact.role,"Role not confirmed — typically Founder/CEO/MD"))}</div>
-        <b>Email</b><div>${contact.email && !String(contact.email).includes("NOT VERIFIED") && String(contact.email).includes("@") ? `<a href="mailto:${esc(contact.email)}">${esc(contact.email)}</a>` : esc(nz(contact.email,"CONTACT NOT VERIFIED — no public email found"))}</div>
-        <b>Call</b><div>${contact.phone && /[\d+]{8,}/.test(String(contact.phone)) ? `<a href="tel:${esc(String(contact.phone).replace(/\s/g,''))}">${esc(contact.phone)}</a>` : esc(nz(contact.phone,"No public phone found"))}</div>
-        <b>Verification</b><div>${esc(nz(contact.verification_note))}</div>
-        <b>How we looked</b><div>${esc(nz(contact.rationale))}</div>
-      </div>
-    </div>
-    <div class="card">
-      <h2>Outreach draft</h2>
-      ${mail.body ? `<p><b>Subject:</b> ${esc(nz(mail.subject))}</p><pre>${esc(mail.body)}</pre><p class="muted"><b>Why this pitch:</b> ${esc(nz(mail.pitch_rationale))}</p><p class="muted">Draft status: ${esc(nz(mail.status,"draft"))}</p>` : `<p class="muted">${esc(nz(mail.body,"No outreach draft because this prospect was not qualified, research failed, or it was a publisher/article URL."))}</p>`}
-    </div>
-    <div class="card muted">Source: ${esc(nz(d.source))} · ${esc(nz(d.source_url))} · Discovered ${esc(nz(d.discovered_at))} · Researched ${esc(nz(d.researched_at))}</div>`;
+function showPeers(peers){
+  const box = document.getElementById("peers");
+  box.classList.remove("hidden");
+  if (!peers.length) { box.innerHTML = "<h2>Companies doing better</h2><p>None turned up on this pass. Try again in a moment.</p>"; return; }
+  box.innerHTML = "<h2>Companies like you, further along</h2>" + peers.map(p =>
+    `<a class="peer" href="${esc(p.website)}" target="_blank" rel="noopener"><b>${esc(p.name)}</b><span>${esc(p.snippet||"")}</span></a>`
+  ).join("");
 }
-async function decide(id, action){
-  const res = await j("/api/prospects/"+id+"/decision", {method:"POST", body:JSON.stringify({action})});
-  document.getElementById("dnote").textContent = res.note || ("Marked "+res.status);
-  openProspect(id);
-}
-async function fb(id, target, value){
-  await j("/api/prospects/"+id+"/feedback", {method:"POST", body:JSON.stringify({target,value})});
-  openProspect(id);
+async function openAdmin(){
+  const pin = prompt("Admin pin");
+  if (!pin) return;
+  const r = await fetch("/api/admin/unlock", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({pin})});
+  if (!r.ok) { alert("Wrong pin"); return; }
+  sessionStorage.setItem("adminPin", pin);
+  location.href = "/admin";
 }
 function esc(s){ return String(s??"").replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
-loadHome();
-setInterval(loadHome, 8000);
 </script>
 </body>
 </html>

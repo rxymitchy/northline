@@ -17,8 +17,10 @@ Return JSON: lead_score, priority, breakdown, why, recommend_contact.
 """
 
 
-def score_prospect(run_id: int, company: dict, research: dict, opportunity: dict, contact: dict | None) -> dict:
+def score_prospect(run_id: int, company: dict, research: dict, opportunity: dict, contact: dict | None, use_llm: bool = True) -> dict:
     heuristic = _heuristic_score(research, opportunity, contact, company)
+    if not use_llm:
+        return heuristic
     user = json.dumps(
         {
             "company": company.get("name"),
