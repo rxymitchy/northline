@@ -2,6 +2,8 @@
 
 **Manual work is quietly ruining the company.**
 
+Repo: [github.com/rxymitchy/northline](https://github.com/rxymitchy/northline)
+
 Northline looks at how a business actually takes work in — website, social profile, spreadsheet, or a short description — and says what still depends on a person. It is not a generic lead scraper.
 
 Public app: paste how you work, get a snapshot, email or download the full report, then optionally see **real companies** (not blogs or roundups) that are further along. Those companies are written into the report when you download or email it again.
