@@ -119,7 +119,7 @@ def _html_doc(name, site, industry, observed, facts, gaps, offer, similar, right
 </style></head><body>
   <h1>{escape(name)}</h1>
   <p class="sub">{escape(site_line + (" · " if site_line else "") + "operations snapshot from " + BRAND)}</p>
-  <p class="sub">Manual work is quietly ruining the company</p>
+  <p class="sub">See what's still manual</p>
   <h2>Business operations snapshot</h2>
   <p>Overall manual dependency: <span class="sev">{escape(str(overall).upper())}</span></p>
   <p>{escape(str(observed))}</p>
@@ -165,7 +165,7 @@ def _text_doc(name, site, industry, observed, facts, gaps, offer, similar, right
     bits = [
         f"{name}",
         f"{site} {('· ' + industry) if industry else ''}".strip(),
-        "Manual work is quietly ruining the company",
+        "See what's still manual",
         "",
         "BUSINESS OPERATIONS SNAPSHOT",
         f"Overall manual dependency: {str(overall).upper()}",
