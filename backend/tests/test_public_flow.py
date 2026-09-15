@@ -138,6 +138,49 @@ class PageFilterTests(unittest.TestCase):
         self.assertTrue(reason)
 
 
+class PeerSearchTests(unittest.TestCase):
+    def test_ddg_keeps_company_sites_and_drops_noise(self):
+        from app.providers.duckduckgo import DuckDuckGoProvider
+        from app.providers.search_base import SearchResult
+
+        p = DuckDuckGoProvider()
+        junk = SearchResult("YouTube Help", "https://support.google.com/youtube/?hl=en", "", "duckduckgo")
+        bike = SearchResult("Pinkbike", "https://www.pinkbike.com/", "mtb news", "duckduckgo")
+        good = SearchResult(
+            "Smile Africa | Dental Clinic | Nairobi, Kenya",
+            "https://www.smileafricadentalclinic.com/",
+            "Dental clinic in Nairobi",
+            "duckduckgo",
+        )
+        self.assertFalse(p._useful("clinic Nairobi Kenya", junk))
+        self.assertFalse(p._useful("clinic Nairobi Kenya", bike))
+        self.assertTrue(p._useful("clinic Nairobi Kenya", good))
+
+    @patch("app.modules.peers._fetch_page")
+    def test_harvests_company_links_from_directory(self, fetch):
+        import time
+
+        from app.modules.peers import _harvest_listing
+
+        fetch.return_value = {
+            "url": "https://www.businesslist.co.ke/category/medical-clinic/city:nairobi",
+            "links": ["https://revodental.com/", "https://facebook.com/revo", "/local-page"],
+            "title": "Clinics",
+            "text": "",
+            "html_sample": "",
+        }
+        rows = _harvest_listing(
+            1,
+            "https://www.businesslist.co.ke/category/medical-clinic/city:nairobi",
+            set(),
+            {"label": "clinic", "must": ("clinic",), "keys": ("clinic",), "reject": ()},
+            time.monotonic() + 10,
+        )
+        sites = " ".join(r["website"] for r in rows)
+        self.assertIn("revodental.com", sites)
+        self.assertNotIn("facebook.com", sites)
+
+
 class VisitorResearchTests(unittest.TestCase):
     @patch("app.modules.research._public_mentions")
     @patch("app.modules.research._fetch_page")
