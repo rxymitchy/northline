@@ -37,6 +37,12 @@ class ApiGuardTests(unittest.TestCase):
         self.assertNotIn("password", body)
         self.assertIn("smtp_configured", r.json())
 
+    def test_book_redirects_to_calendly(self):
+        r = self.client.get("/book", follow_redirects=False)
+        self.assertEqual(r.status_code, 302)
+        location = r.headers.get("location") or ""
+        self.assertIn("calendly.com", location)
+
     def test_describe_flow_builds_downloadable_report(self):
         r = self.client.post(
             "/api/search",
