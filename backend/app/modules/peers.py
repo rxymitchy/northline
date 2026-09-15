@@ -1,6 +1,6 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from app.logging_util import log_event
 from app.modules.page_type import (
@@ -177,6 +177,9 @@ _SKIP_HOSTS = (
     "youtube.com",
     "google.com",
     "maps.google.",
+    "jumia.co.ke",
+    "amazon.com",
+    "ebay.com",
 )
 
 
@@ -278,6 +281,7 @@ def _collect_from_hits(
 ) -> list[dict]:
     candidates: list[dict] = []
     local_seen = set(seen_hosts)
+    listings: list[str] = []
     for row in hits:
         if time.monotonic() >= deadline:
             break
@@ -292,6 +296,8 @@ def _collect_from_hits(
         snippet = (getattr(row, "snippet", None) or "").strip()[:220]
         blob = f"{title_for_filter} {snippet} {url}".lower()
         if is_publisher_host(host) or should_skip_search_result(url, title_for_filter, snippet):
+            local_seen.add(host)
+            listings.append(url)
             continue
         if strict and not _on_topic(blob, profile, strict=True):
             continue
@@ -313,6 +319,18 @@ def _collect_from_hits(
         )
         if len(candidates) >= 14:
             break
+    if len(candidates) < 8:
+        for listing_url in listings[:2]:
+            if time.monotonic() >= deadline:
+                break
+            harvested = _harvest_listing(run_id, listing_url, local_seen, profile, deadline)
+            candidates.extend(harvested)
+            for row_h in harvested:
+                h = urlparse(row_h.get("website") or "").netloc.lower().replace("www.", "")
+                if h:
+                    local_seen.add(h)
+            if len(candidates) >= 14:
+                break
     return _verify_companies(run_id, candidates, 8, deadline)
 
 
@@ -365,12 +383,14 @@ def _confirm_company(cand: dict) -> dict | None:
         text = page.get("text") or ""
         html = page.get("html_sample") or ""
         blob = f"{title} {text[:4000]} {cand.get('snippet') or ''}".lower()
+        final = page.get("url") or url
         if looks_like_article_page(title, text, url, html[:2500]):
+            return None
+        if "account suspended" in title.lower() or "cgi-sys/suspendedpage" in final.lower():
             return None
         if not _on_topic(blob, profile, strict=False):
             if any(r in blob for r in (profile.get("reject") or ()) if r):
                 return None
-        final = page.get("url") or url
         name = (title or cand.get("name") or final).split("|")[0].split(" - ")[0].strip()[:80]
         snippet = (page.get("description") or cand.get("snippet") or "").strip()[:220]
         why, evidence = _relevance(blob, industry, looks_like_operating_company(title, text, url, html[:2500]), profile)
@@ -415,6 +435,51 @@ def _on_topic(blob: str, profile: dict, strict: bool = True) -> bool:
 def _skip_host(host: str) -> bool:
     host = (host or "").lower()
     return any(host == h or host.endswith("." + h) or h in host for h in _SKIP_HOSTS)
+
+
+def _harvest_listing(run_id: int, url: str, seen_hosts: set[str], profile: dict, deadline: float) -> list[dict]:
+    if time.monotonic() >= deadline - 1:
+        return []
+    try:
+        page = _fetch_page(url, timeout=4, skip_robots=True)
+    except Exception:
+        page = None
+    if not page:
+        return []
+    base = page.get("url") or url
+    found: list[dict] = []
+    local = set(seen_hosts)
+    for href in page.get("links") or []:
+        if time.monotonic() >= deadline:
+            break
+        raw = urljoin(base, (href or "").strip())
+        if not raw.startswith("http"):
+            continue
+        home = homepage_from_article_path(raw)
+        host = urlparse(home).netloc.lower().replace("www.", "")
+        if not host or host in local or _skip_host(host) or is_publisher_host(host):
+            continue
+        if should_skip_search_result(home, host, ""):
+            continue
+        title = host.split(".")[0].replace("-", " ").title()
+        blob = f"{title} {home}".lower()
+        if not _on_topic(blob, profile, strict=False) and any(r in blob for r in (profile.get("reject") or ()) if r):
+            continue
+        local.add(host)
+        found.append(
+            {
+                "name": title,
+                "website": home,
+                "snippet": "",
+                "kind": "industry",
+                "industry": profile["label"],
+                "profile": profile,
+            }
+        )
+        if len(found) >= 8:
+            break
+    log_event(run_id, "peer_harvest", f"{url} → {len(found)} company links")
+    return found
 
 
 def _dedupe(rows: list[dict]) -> list[dict]:
