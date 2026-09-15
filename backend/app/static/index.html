@@ -22,7 +22,12 @@
     .page { max-width: 680px; margin: 0 auto; padding: 8vh 20px 88px; }
     h1 { font-size: clamp(26px, 4vw, 34px); font-weight: 650; letter-spacing: -.03em; line-height: 1.2; margin: 0 0 10px; text-align: center; }
     .brand { text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--blue); margin: 0 0 14px; }
-    .slogan { text-align: center; color: var(--mute); margin: 0 0 28px; font-size: 15px; }
+    .slogan { text-align: center; color: var(--mute); margin: 0 0 18px; font-size: 15px; }
+    .how { margin: 0 auto 22px; padding: 0; list-style: none; max-width: 420px; color: var(--mute); font-size: 14px; }
+    .how li { display: flex; gap: 10px; margin: 8px 0; text-align: left; line-height: 1.4; }
+    .how b { color: var(--ink); font-weight: 650; min-width: 1.2em; }
+    .choose-label { font-size: 13px; font-weight: 700; margin: 0 0 8px; color: var(--ink); }
+    .path-hint { font-size: 13px; color: var(--mute); margin: 0 0 16px; }
     .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
     .choice {
       border: 1px solid var(--line);
@@ -94,14 +99,21 @@
   <div class="page">
     <form id="form">
       <p class="brand">Northline</p>
-      <h1>Manual work is quietly ruining the company</h1>
-      <p class="slogan">Show how work comes in. Northline will say what still depends on a person — and what to automate first.</p>
+      <h1>See what's still manual</h1>
+      <p class="slogan">Tell us how work comes in. We'll show what to automate first.</p>
+      <ol class="how">
+        <li><b>1</b><span>Pick one option below.</span></li>
+        <li><b>2</b><span>Add the link, file, or a short note.</span></li>
+        <li><b>3</b><span>Enter your name and email, then tap <b>See the diagnosis</b>.</span></li>
+      </ol>
+      <p class="choose-label">Choose one</p>
       <div class="choices">
         <button type="button" class="choice on" data-source="website">Website</button>
         <button type="button" class="choice" data-source="social">Social media</button>
         <button type="button" class="choice" data-source="csv">Data file / CSV</button>
         <button type="button" class="choice" data-source="describe">Describe how you work</button>
       </div>
+      <p class="path-hint" id="pathHint">Paste the company website.</p>
       <div id="urlWrap">
         <label id="urlLabel" for="url">Website</label>
         <input id="url" type="url" placeholder="https://" />
@@ -112,7 +124,7 @@
       </div>
       <div id="descWrap" class="hidden">
         <label for="description">How work moves today</label>
-        <textarea id="description" placeholder="Who takes the lead, where it lives (WhatsApp, Excel, inbox), what you do by hand…"></textarea>
+        <textarea id="description" placeholder="Who takes the lead, where it sits, what you still do by hand…"></textarea>
       </div>
       <label for="name">Your name</label>
       <input id="name" type="text" autocomplete="name" required />
@@ -150,6 +162,13 @@ document.querySelectorAll(".choice").forEach(btn => {
     document.getElementById("fileWrap").classList.toggle("hidden", source!=="csv");
     document.getElementById("descWrap").classList.toggle("hidden", source!=="describe" && source!=="csv");
     document.getElementById("urlLabel").textContent = source==="social" ? "Social profile link" : "Website";
+    const hints = {
+      website: "Paste the company website.",
+      social: "Paste a public profile link.",
+      csv: "Upload the file, then add a short note about follow-up.",
+      describe: "Write how leads come in and what you do by hand.",
+    };
+    document.getElementById("pathHint").textContent = hints[source] || hints.website;
   };
 });
 document.getElementById("form").onsubmit = async (e) => {

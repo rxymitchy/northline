@@ -1,6 +1,6 @@
 # Northline
 
-**Manual work is quietly ruining the company.**
+**See what's still manual.**
 
 Repo: [github.com/rxymitchy/northline](https://github.com/rxymitchy/northline)
 
