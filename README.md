@@ -39,7 +39,13 @@ copy ..\.env.example .env
 py -3.13 -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Open **http://127.0.0.1:8000**.
+Open **http://127.0.0.1:8000** locally, or the public URL after deploy (Render/Railway).
+
+## Deploy
+
+The app is a FastAPI service in `backend/`. On Render, connect [github.com/rxymitchy/northline](https://github.com/rxymitchy/northline) and use `render.yaml`. On Railway, deploy from the same repo (Dockerfile at the root). The service must listen on `0.0.0.0` and `$PORT`.
+
+Set `BOOKING_URL` (already defaulted), `ADMIN_PIN` in the host’s dashboard — never commit `.env`. Visitor diagnosis does not need OpenAI.
 
 Use **Python 3.13** (or any version with the packages in `requirements.txt` installed). On Windows, antivirus HTTPS scanning can block Python SSL; fetches go through a stack that usually still works.
 
