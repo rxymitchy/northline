@@ -297,11 +297,13 @@ def find_better(run_id: int) -> dict:
         peers = find_better_companies(run_id, company.name, company.website or "", research)
         fi["doing_it_right"] = peers
         fi["peers_status"] = "ready" if peers else "empty"
-        fi["industry"] = fi.get("industry") or company.industry
+        fi["industry"] = fi.get("industry") or company.industry or guess_industry(company.name, research)
         brief = compose_brief(company, fi)
         fi["brief"] = brief
         company.fact_inference = json.dumps(fi)
+        company.industry = fi["industry"]
         run.status = "completed"
+        db.commit()
         _progress(db, run, "Ready")
         log_event(run_id, "better_done", f"{len(peers)} companies")
         return {"ok": True, "peers": peers}

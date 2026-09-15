@@ -93,6 +93,12 @@
     .note.good { color: #166534; }
     .caveat { color: var(--mute); font-size: 13px; margin-top: 10px; }
     .actions { margin-top: 8px; }
+    .back {
+      background: none; border: 0; color: var(--blue); cursor: pointer;
+      font: 600 14px/1 inherit; padding: 0; margin: 0 0 14px;
+    }
+    .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; }
+    .toolbar .btn.ghost { width: auto; margin-top: 0; min-height: 40px; padding: 0 14px; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -131,10 +137,15 @@
       <label for="email">Email</label>
       <input id="email" type="email" autocomplete="email" required />
       <button class="btn primary" id="searchBtn" type="submit">See the diagnosis</button>
+      <div class="toolbar">
+        <button class="btn ghost hidden" id="resumeBtn" type="button">Back to last diagnosis</button>
+        <button class="btn ghost" id="clearBtn" type="button">Clear my details</button>
+      </div>
       <p class="err" id="err"></p>
     </form>
 
     <div id="live" class="hidden">
+      <button class="back" id="backBtn" type="button">← Back</button>
       <p class="stage" id="stage">Checking public pages and web mentions…</p>
       <p class="hint" id="hint">Looking at your site plus public mentions of the company. Usually 10–20 seconds.</p>
       <div id="results" class="cards hidden"></div>
@@ -154,22 +165,132 @@ let runId = null;
 let poll = null;
 let bookingUrl = "";
 let contactEmail = "";
-document.querySelectorAll(".choice").forEach(btn => {
-  btn.onclick = () => {
-    source = btn.dataset.source;
-    document.querySelectorAll(".choice").forEach(b => b.classList.toggle("on", b===btn));
-    document.getElementById("urlWrap").classList.toggle("hidden", source==="csv" || source==="describe");
-    document.getElementById("fileWrap").classList.toggle("hidden", source!=="csv");
-    document.getElementById("descWrap").classList.toggle("hidden", source!=="describe" && source!=="csv");
-    document.getElementById("urlLabel").textContent = source==="social" ? "Social profile link" : "Website";
-    const hints = {
-      website: "Paste the company website.",
-      social: "Paste a public profile link.",
-      csv: "Upload the file, then add a short note about follow-up.",
-      describe: "Write how leads come in and what you do by hand.",
-    };
-    document.getElementById("pathHint").textContent = hints[source] || hints.website;
+const DRAFT_KEY = "northline-draft";
+const RUN_KEY = "northline-run";
+const RESULT_KEY = "northline-result";
+
+function setSource(next, save){
+  source = next || "website";
+  document.querySelectorAll(".choice").forEach(b => b.classList.toggle("on", b.dataset.source===source));
+  document.getElementById("urlWrap").classList.toggle("hidden", source==="csv" || source==="describe");
+  document.getElementById("fileWrap").classList.toggle("hidden", source!=="csv");
+  document.getElementById("descWrap").classList.toggle("hidden", source!=="describe" && source!=="csv");
+  document.getElementById("urlLabel").textContent = source==="social" ? "Social profile link" : "Website";
+  const hints = {
+    website: "Paste the company website.",
+    social: "Paste a public profile link.",
+    csv: "Upload the file, then add a short note about follow-up.",
+    describe: "Write how leads come in and what you do by hand.",
   };
+  document.getElementById("pathHint").textContent = hints[source] || hints.website;
+  if (save !== false) saveDraft();
+}
+function saveDraft(){
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      source,
+      url: document.getElementById("url").value,
+      description: document.getElementById("description").value,
+      name: document.getElementById("name").value,
+      email: document.getElementById("email").value,
+    }));
+  } catch (ex) {}
+  syncResume();
+}
+function saveRun(){
+  try { localStorage.setItem(RUN_KEY, JSON.stringify({ id: runId })); } catch (ex) {}
+  syncResume();
+}
+function saveResult(res){
+  try { localStorage.setItem(RESULT_KEY, JSON.stringify(res || null)); } catch (ex) {}
+}
+function loadCachedResult(){
+  try {
+    const data = JSON.parse(localStorage.getItem(RESULT_KEY) || "null");
+    if (data && typeof data === "object") renderResult(data);
+  } catch (ex) {}
+}
+function loadDraft(){
+  try {
+    const data = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
+    if (!data || typeof data !== "object") return;
+    if (data.url) document.getElementById("url").value = data.url;
+    if (data.description) document.getElementById("description").value = data.description;
+    if (data.name) document.getElementById("name").value = data.name;
+    if (data.email) document.getElementById("email").value = data.email;
+    if (data.source) setSource(data.source, false);
+  } catch (ex) {}
+}
+function loadRun(){
+  try {
+    const data = JSON.parse(localStorage.getItem(RUN_KEY) || "null");
+    if (data && data.id) runId = data.id;
+  } catch (ex) {}
+}
+function syncResume(){
+  const btn = document.getElementById("resumeBtn");
+  if (!btn) return;
+  btn.classList.toggle("hidden", !runId);
+}
+function showForm(push){
+  document.getElementById("form").classList.remove("hidden");
+  document.getElementById("live").classList.add("hidden");
+  document.getElementById("searchBtn").disabled = false;
+  syncResume();
+  if (push !== false) history.pushState({ page: "form" }, "", location.pathname + location.search);
+}
+function showLive(push){
+  document.getElementById("form").classList.add("hidden");
+  document.getElementById("live").classList.remove("hidden");
+  if (push !== false) history.pushState({ page: "live" }, "", "#diagnosis");
+}
+function clearMine(){
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+    localStorage.removeItem(RUN_KEY);
+    localStorage.removeItem(RESULT_KEY);
+  } catch (ex) {}
+  runId = null;
+  if (poll) clearInterval(poll);
+  poll = null;
+  document.getElementById("url").value = "";
+  document.getElementById("description").value = "";
+  document.getElementById("name").value = "";
+  document.getElementById("email").value = "";
+  document.getElementById("file").value = "";
+  document.getElementById("err").textContent = "";
+  document.getElementById("results").innerHTML = "";
+  document.getElementById("results").classList.add("hidden");
+  document.getElementById("peers").innerHTML = "";
+  document.getElementById("peers").classList.add("hidden");
+  document.getElementById("downloadBtn").classList.add("hidden");
+  document.getElementById("betterBtn").classList.add("hidden");
+  document.getElementById("helpBtn").classList.add("hidden");
+  setNote("", "");
+  setSource("website", false);
+  showForm();
+}
+document.querySelectorAll(".choice").forEach(btn => {
+  btn.onclick = () => setSource(btn.dataset.source);
+});
+["url","description","name","email"].forEach(id => {
+  document.getElementById(id).addEventListener("input", saveDraft);
+});
+document.getElementById("backBtn").onclick = () => showForm();
+document.getElementById("clearBtn").onclick = clearMine;
+document.getElementById("resumeBtn").onclick = () => {
+  if (!runId) return;
+  showLive();
+  loadCachedResult();
+  watch();
+};
+window.addEventListener("popstate", (ev) => {
+  const page = (ev.state && ev.state.page) || (location.hash === "#diagnosis" ? "live" : "form");
+  if (page === "live" && runId) {
+    showLive(false);
+    loadCachedResult();
+    watch();
+  } else showForm(false);
 });
 document.getElementById("form").onsubmit = async (e) => {
   e.preventDefault();
@@ -194,8 +315,9 @@ document.getElementById("form").onsubmit = async (e) => {
     const data = await r.json().catch(()=>({}));
     if (!r.ok) throw new Error(typeof data.detail==="string" ? data.detail : "Could not start");
     runId = data.id;
-    document.getElementById("form").classList.add("hidden");
-    document.getElementById("live").classList.remove("hidden");
+    saveDraft();
+    saveRun();
+    showLive();
     document.getElementById("stage").textContent = "Checking public pages and web mentions…";
     document.getElementById("hint").textContent = "Looking at your site plus public mentions of the company. Usually 10–20 seconds.";
     watch();
@@ -220,6 +342,7 @@ function watch(){
       document.getElementById("stage").textContent = p;
     }
     if (d.result && d.status==="completed") {
+      saveResult(d.result);
       renderResult(d.result);
       clearInterval(poll);
     }
@@ -328,7 +451,12 @@ function withCalendlyPrefill(base){
 }
 function downloadReport(){
   setNote("Your browser should start the download. If it does not, check pop-up or download settings.", "");
-  window.location.href = "/api/runs/"+runId+"/report";
+  const a = document.createElement("a");
+  a.href = "/api/runs/"+runId+"/report";
+  a.download = "";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 async function findBetter(){
   const btn = document.getElementById("betterBtn");
@@ -343,7 +471,7 @@ async function findBetter(){
     const peers = (d.result && d.result.doing_it_right) || [];
     const status = d.result && d.result.peers_status;
     const industry = (d.result && d.result.industry) || "";
-    if (status === "ready" || status === "empty" || Date.now()-started > 55000) {
+    if (status === "ready" || status === "empty" || Date.now()-started > 85000) {
       clearInterval(t);
       document.getElementById("stage").textContent = "Business operations snapshot";
       document.getElementById("hint").textContent = "";
@@ -358,7 +486,7 @@ function showPeers(peers, industry){
   box.classList.remove("hidden");
   const label = industry ? "Companies in " + industry : "Companies in this industry";
   if (!peers.length) {
-    box.innerHTML = "<h2>"+esc(label)+"</h2><p>Search did not return enough company sites this time. Try again in a moment — we do not invent businesses to fill the list.</p>";
+    box.innerHTML = "<h2>"+esc(label)+"</h2><p>No company sites came back this round (search was quiet or pages were blocked). Tap the button again — Northline will not invent businesses to fill the list.</p>";
     return;
   }
   box.innerHTML = "<h2>"+esc(label)+"</h2><p class='caveat' style='margin-bottom:8px'>Public company sites in a related space. If we cannot see automation on the homepage, we say so.</p>" + peers.map(p =>
@@ -374,6 +502,14 @@ async function openAdmin(){
   location.href = "/admin";
 }
 function esc(s){ return String(s??"").replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+loadDraft();
+loadRun();
+syncResume();
+if (location.hash === "#diagnosis" && runId) {
+  showLive(false);
+  loadCachedResult();
+  watch();
+}
 </script>
 </body>
 </html>

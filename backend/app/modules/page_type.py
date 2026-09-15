@@ -63,6 +63,9 @@ PUBLISHER_DOMAINS = {
     "originlab.com",
     "crunchbase.com",
     "zoominfo.com",
+    "rocketreach.co",
+    "placidway.com",
+    "nyongesasande.com",
     "blogspot.com",
     "blogger.com",
     "wordpress.com",
@@ -85,6 +88,8 @@ LISTING_HOST_BITS = (
     "businesslist",
     "hotfrog",
     "cylex",
+    "rocketreach",
+    "placidway",
 )
 
 ARTICLE_PATH_BITS = (

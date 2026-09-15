@@ -7,8 +7,14 @@ class DuckDuckGoProvider(SearchProvider):
     name = "duckduckgo"
 
     def search(self, query: str, max_results: int = 10) -> list[SearchResult]:
-        # One region only — a second pass was doubling wait time on diagnosis.
-        return self._query(query, max_results, "wt-wt")[:max_results]
+        items = self._query(query, max_results, "wt-wt")
+        if len(items) < 2:
+            extra = self._query(query, max_results, "ke-en")
+            seen = {i.url for i in items}
+            for row in extra:
+                if row.url not in seen:
+                    items.append(row)
+        return items[:max_results]
 
     def _query(self, query: str, max_results: int, region: str) -> list[SearchResult]:
         from ddgs import DDGS
@@ -32,7 +38,7 @@ class DuckDuckGoProvider(SearchProvider):
 
         pool = ThreadPoolExecutor(max_workers=1)
         try:
-            return pool.submit(run).result(timeout=6)
+            return pool.submit(run).result(timeout=10)
         except Exception:
             return []
         finally:
