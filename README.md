@@ -18,7 +18,7 @@ A PIN-locked **admin** hunt still finds other businesses with public automation 
 2. Add name and email, then **See the diagnosis**.
 3. Northline reads the page you sent **and** a short public web search for the company (news, directories, other mentions), in parallel, with a hard time cap so this usually finishes in **10–20 seconds**.
 4. On-page snapshot: overall manual dependency, which processes still wait on a person, what to automate first, and a suggested workflow.
-5. **Download the full report**. Optional: ask Northline for help (booking link or a follow-up on the email you already gave).
+5. **Download the full report**. Optional: **Schedule a 20-minute call** opens your **Calendly** event (`BOOKING_URL`), with name and email filled in.
 6. **See companies in this industry** — operating businesses, not blogs or roundups. Download the report again so they are in the file.
 
 Visitor diagnosis stays heuristic: no OpenAI, no invented emails, no login/CAPTCHA bypass. Search is bounded so a slow site or DuckDuckGo cannot hang the page for a minute.
@@ -53,7 +53,8 @@ An older Next.js dashboard lives in `frontend/` and talks to the same API. The p
 | `SMTP_PORT` / `SMTP_USE_TLS` | No | Default `587` + TLS |
 | `EMAIL_SENDING_ENABLED` / `OUTBOUND_SEND_ENABLED` | Keep `false` until SMTP works | Cold emails to public contacts |
 | `ADMIN_PIN` | For `/admin` | Unlock the hunt dashboard |
-| `BOOKING_URL` / `CONTACT_EMAIL` | No | Public “help with this” CTA after diagnosis |
+| `BOOKING_URL` | For the call CTA | Calendly event URL, e.g. `https://calendly.com/you/20min` |
+| `CONTACT_EMAIL` | No | Fallback only if Calendly is not set |
 | `OPENAI_API_KEY` | For AI drafts | Admin ICP/outreach; visitor search does not need it |
 | `SEARCH_PROVIDER` | No | `duckduckgo` (free), `tavily`, `serper`, or `brave` |
 | `TAVILY_API_KEY` / `SERPER_API_KEY` / `BRAVE_API_KEY` | If you switch provider | Search APIs |
