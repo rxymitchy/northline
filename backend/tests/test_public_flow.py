@@ -108,6 +108,19 @@ class IndustryGuessTests(unittest.TestCase):
         profile = industry_profile("Maison", {"text": "perfume fragrance"}, "")
         self.assertTrue(_on_topic("nairobi perfume house essential oils", profile))
         self.assertFalse(_on_topic("nairobi dental clinic appointments", profile))
+        self.assertTrue(_on_topic("kenya nairobi manufacturer", profile, strict=False))
+
+    def test_peer_queries_include_kenya_fallbacks(self):
+        from app.modules.peers import _peer_queries
+
+        qs = _peer_queries(
+            {"label": "clinic", "must": ("clinic", "dental"), "queries": ("clinic Nairobi Kenya",)},
+            "City Dental",
+        )
+        joined = " ".join(qs).lower()
+        self.assertIn("kenya", joined)
+        self.assertIn("nairobi", joined)
+        self.assertTrue(any("city dental" in q.lower() for q in qs))
 
     def test_fallback_is_not_a_service_agency(self):
         label = guess_industry("Alex", {"text": "we use excel"}, "")
