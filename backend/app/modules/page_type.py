@@ -198,6 +198,8 @@ def is_editorial_name(name: str) -> bool:
         return True
     if re.match(r"^(top|best|leading)\b.+\b(kenya|nairobi|2024|2025|2026)\b", text, re.I):
         return True
+    if re.search(r"\b(brands|companies|agencies)\s+in\s+kenya\b", text, re.I):
+        return True
     return False
 
 
@@ -205,6 +207,8 @@ def should_skip_search_result(url: str, title: str, snippet: str = "") -> str | 
     """Skip pages that are about companies, not the company itself."""
     host = host_of(url)
     blob = f"{title} {snippet} {url}".lower()
+    if "/showthread" in (url or "").lower() or "/forum/" in (url or "").lower():
+        return "Forum thread, not a company homepage"
     if is_publisher_host(host):
         return f"Third-party article/listing site ({host}), not the company's own website"
     if is_listing_path(url) and (LISTICLE_TITLE.search(title or blob) or "/blog/" in url.lower() or "/news/" in url.lower()):

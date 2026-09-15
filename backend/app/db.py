@@ -31,3 +31,6 @@ def init_db():
         cols = [row[1] for row in conn.execute(text("PRAGMA table_info(research_runs)"))]
         if "kind" not in cols:
             conn.execute(text("ALTER TABLE research_runs ADD COLUMN kind VARCHAR(40) DEFAULT 'outbound'"))
+        inquiry_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(inquiries)"))]
+        if inquiry_cols and "wants_help" not in inquiry_cols:
+            conn.execute(text("ALTER TABLE inquiries ADD COLUMN wants_help BOOLEAN DEFAULT 0"))

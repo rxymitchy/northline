@@ -5,14 +5,15 @@ from urllib.parse import urlparse
 
 from app.brief import BRAND, build_brief
 from app.db import SessionLocal
-from app.emailer import send_email
+from app.emailer import send_email, valid_email
 from app.logging_util import log_event
 from app.models import Company, Contact, Opportunity, Outreach, ResearchRun
 from app.modules.channel_notes import channel_notes
+from app.modules.diagnosis import build_diagnosis
 from app.modules.gap import detect_automation_gap
 from app.modules.opportunity import detect_opportunity
-from app.modules.peers import find_better_companies
-from app.modules.research import research_company
+from app.modules.peers import find_better_companies, guess_industry
+from app.modules.research import visitor_research
 from app.modules.scoring import score_prospect
 
 
@@ -40,7 +41,7 @@ def run_search(run_id: int) -> None:
         email = sub.get("email") or ""
         source = sub.get("source") or "website"
         run.status = "running"
-        _progress(db, run, "Looking at how you work. This usually takes under a minute…")
+        _progress(db, run, "Checking public pages and web mentions…")
         log_event(run_id, "search_start", f"{name} · {source}")
 
         site, host, research = _gather_research(run_id, sub)
@@ -93,6 +94,11 @@ def run_search(run_id: int) -> None:
         company.confidence = opportunity.get("confidence") or ("Medium" if gap.get("exists") else "Low")
 
         notes = channel_notes(source, company.website or sub.get("url") or "", research, gap)
+        diagnosis = build_diagnosis(source, research, gap, notes)
+        company.observed_problem = diagnosis.get("summary") or opportunity.get("observed_problem") or gap.get("summary")
+        company.automation_opportunity = (diagnosis.get("automate_first") or {}).get("reason") or company.automation_opportunity
+        extra = " ".join([sub.get("url") or "", sub.get("description") or "", company.website or ""])
+        company.industry = guess_industry(name, research, extra)
         company.fact_inference = json.dumps(
             {
                 "facts": opportunity.get("facts") or gap.get("facts") or [],
@@ -104,6 +110,8 @@ def run_search(run_id: int) -> None:
                 "research_text": (research.get("text") or "")[:8000],
                 "channel": notes,
                 "source": source,
+                "diagnosis": diagnosis,
+                "industry": company.industry,
             }
         )
         db.add(
@@ -204,6 +212,7 @@ def compose_brief(company: Company, fi: dict) -> dict:
         peers,
         emailed=bool(fi.get("emailed")),
         channel=fi.get("channel") if isinstance(fi.get("channel"), dict) else {},
+        diagnosis=fi.get("diagnosis") if isinstance(fi.get("diagnosis"), dict) else {},
     )
 
 
@@ -217,16 +226,31 @@ def email_report(run_id: int) -> dict:
         email = (sub.get("email") or "").strip()
         company = db.query(Company).filter(Company.run_id == run_id).order_by(Company.id.asc()).first()
         if not company:
-            return {"sent": False, "reason": "Search is not ready yet"}
+            return {"sent": False, "code": "not_ready", "reason": "The snapshot is not ready yet"}
+        if not valid_email(email):
+            return {"sent": False, "code": "invalid_email", "reason": "That email address does not look valid."}
         fi = _fi(company)
         brief = compose_brief(company, fi)
         fi["brief"] = brief
         company.fact_inference = json.dumps(fi)
         db.commit()
-        subject = f"Your {BRAND} report — {company.name}"
-        body = brief.get("text") or company.observed_problem or "Your report is ready."
+        subject = f"Your Northline operations snapshot — {company.name}"
+        intro = (
+            f"Hi {company.name},\n\n"
+            "Here is the operations snapshot you asked Northline to prepare. "
+            "It is based on what you submitted and what is visible publicly — not on internal systems we cannot see.\n\n"
+        )
+        body = intro + (brief.get("text") or company.observed_problem or "Your report is ready.")
         html = brief.get("html")
-        mail = send_email(email, subject, body, html=html)
+        safe_name = "".join(c if c.isalnum() else "-" for c in (company.name or "northline"))[:40]
+        mail = send_email(
+            email,
+            subject,
+            body,
+            html=html,
+            attachment_html=html,
+            attachment_name=f"{safe_name}-northline-report.html",
+        )
         outreach = db.query(Outreach).filter(Outreach.company_id == company.id).order_by(Outreach.id.desc()).first()
         if mail.get("sent"):
             company.status = "self_report_emailed"
@@ -240,9 +264,9 @@ def email_report(run_id: int) -> dict:
                 fi["brief"] = brief
             company.fact_inference = json.dumps(fi)
             db.commit()
-            log_event(run_id, "email_sent", mail.get("reason") or "")
+            log_event(run_id, "email_sent", "Visitor report emailed")
         else:
-            log_event(run_id, "email_not_sent", mail.get("reason") or "", level="warning")
+            log_event(run_id, "email_not_sent", f"{mail.get('code') or 'failed'}: {mail.get('reason') or ''}", level="warning")
         return mail
     finally:
         db.close()
@@ -257,13 +281,23 @@ def find_better(run_id: int) -> dict:
         company = db.query(Company).filter(Company.run_id == run_id).order_by(Company.id.asc()).first()
         if not company:
             return {"ok": False, "peers": []}
-        _progress(db, run, "Finding companies doing better")
-        run.status = "running"
-        db.commit()
+        _progress(db, run, "Finding comparable companies…")
         fi = _fi(company)
-        research = {"text": fi.get("research_text") or company.description or ""}
+        research = {
+            "text": " ".join(
+                [
+                    fi.get("research_text") or "",
+                    company.description or "",
+                    company.website or "",
+                    company.industry or "",
+                    fi.get("industry") or "",
+                ]
+            )
+        }
         peers = find_better_companies(run_id, company.name, company.website or "", research)
         fi["doing_it_right"] = peers
+        fi["peers_status"] = "ready" if peers else "empty"
+        fi["industry"] = fi.get("industry") or company.industry
         brief = compose_brief(company, fi)
         fi["brief"] = brief
         company.fact_inference = json.dumps(fi)
@@ -277,6 +311,13 @@ def find_better(run_id: int) -> dict:
         if run:
             run.status = "completed"
             db.commit()
+        company = db.query(Company).filter(Company.run_id == run_id).order_by(Company.id.asc()).first() if run else None
+        if company:
+            fi = _fi(company)
+            fi["peers_status"] = "empty"
+            fi["doing_it_right"] = fi.get("doing_it_right") or []
+            company.fact_inference = json.dumps(fi)
+            db.commit()
         log_event(run_id, "better_error", str(exc), level="error")
         return {"ok": False, "peers": [], "reason": str(exc)}
     finally:
@@ -284,22 +325,17 @@ def find_better(run_id: int) -> dict:
 
 
 def _gather_research(run_id: int, sub: dict) -> tuple[str, str, dict]:
-    source = sub.get("source") or "website"
     url = normalize_website(sub.get("url") or "")
     blob = (sub.get("description") or "").strip()
-    if source in ("website", "social") and url:
-        cand = {"name": sub.get("name"), "website": url, "source_url": url, "track": "operational_pain"}
-        research = research_company(run_id, cand, quick=True)
-        if research.get("ok"):
-            host = urlparse(research.get("website") or url).netloc.replace("www.", "")
-            return research.get("website") or url, host, research
-        if blob:
-            return url, urlparse(url).netloc.replace("www.", ""), _text_research(blob + "\n" + url)
-        return url, urlparse(url).netloc.replace("www.", ""), research
-    if not blob:
-        blob = url or "The company described repetitive manual work."
-    host = urlparse(url).netloc.replace("www.", "") if url else ""
-    return url, host, _text_research(blob)
+    name = (sub.get("name") or "").strip()
+    if not url and not blob and not name:
+        return url, "", {"ok": False, "reason": "Not enough information to analyse yet."}
+    research = visitor_research(run_id, name, url, blob)
+    if not research.get("ok") and blob:
+        research = _text_research(blob + ("\n" + url if url else ""))
+    site = research.get("website") or url
+    host = urlparse(site).netloc.replace("www.", "") if site else ""
+    return site, host, research
 
 
 def _text_research(text: str) -> dict:
