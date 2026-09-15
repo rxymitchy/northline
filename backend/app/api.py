@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.emailer import smtp_ready, valid_email
 from app.db import get_db
 from app.export_csv import export_run_csv
 from app.models import Company, Contact, EventLog, Inquiry, Opportunity, Outreach, ResearchRun
@@ -67,8 +68,10 @@ async def create_search(
     source = (source or "").strip().lower()
     url = (url or "").strip()
     description = (description or "").strip()
-    if not name or "@" not in email:
-        raise HTTPException(400, "Name and email are required")
+    if not name:
+        raise HTTPException(400, "Add your name")
+    if not valid_email(email):
+        raise HTTPException(400, "Enter a valid email address")
     if source not in ("website", "social", "csv", "describe"):
         raise HTTPException(400, "Choose how you work")
     csv_text = ""
@@ -106,7 +109,48 @@ async def create_search(
     db.add(inquiry)
     db.commit()
     Thread(target=run_search, args=(run.id,), daemon=True).start()
-    return {"id": run.id, "status": run.status}
+    return {"id": run.id, "status": run.status, "lead_saved": True}
+
+
+@router.post("/runs/{run_id}/help")
+def request_help(run_id: int, db: Session = Depends(get_db)):
+    run = db.get(ResearchRun, run_id)
+    if not run or (getattr(run, "kind", None) or "") != "search":
+        raise HTTPException(404, "Not found")
+    inquiry = db.query(Inquiry).filter(Inquiry.run_id == run_id).order_by(Inquiry.id.desc()).first()
+    if not inquiry:
+        raise HTTPException(400, "No lead was saved for this diagnosis.")
+    inquiry.wants_help = True
+    db.commit()
+    booking = (settings.booking_url or "").strip()
+    contact = (settings.contact_email or "").strip()
+    return {
+        "ok": True,
+        "saved": True,
+        "booking_url": booking,
+        "contact_email": contact,
+        "message": "We noted that you want help. We already have the email you entered.",
+    }
+
+
+@router.get("/leads")
+def list_leads(db: Session = Depends(get_db), x_admin_pin: str | None = Header(default=None)):
+    if not _admin_ok(x_admin_pin):
+        raise HTTPException(403, "Admin only")
+    rows = db.query(Inquiry).order_by(Inquiry.id.desc()).limit(200).all()
+    return [
+        {
+            "id": row.id,
+            "run_id": row.run_id,
+            "name": row.name,
+            "email": row.email,
+            "source": row.source_kind,
+            "detail": (row.source_value or "")[:240],
+            "wants_help": bool(getattr(row, "wants_help", False)),
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+        }
+        for row in rows
+    ]
 
 
 @router.post("/runs/{run_id}/email")
@@ -115,11 +159,25 @@ def send_report(run_id: int, db: Session = Depends(get_db)):
     if not run:
         raise HTTPException(404, "Not found")
     if run.status not in ("completed", "failed"):
-        raise HTTPException(400, "Search is still running")
+        raise HTTPException(400, "The snapshot is still running. Try email in a moment.")
     result = email_report(run_id)
+    if result.get("code") == "invalid_email":
+        raise HTTPException(400, result.get("reason"))
+    if result.get("code") == "smtp_unconfigured":
+        return {
+            "ok": False,
+            "sent": False,
+            "smtp_configured": False,
+            "reason": result.get("reason"),
+        }
     if not result.get("sent"):
-        raise HTTPException(400, result.get("reason") or "Could not send the email. Download the full report below.")
-    return {"ok": True}
+        return {
+            "ok": False,
+            "sent": False,
+            "smtp_configured": smtp_ready(),
+            "reason": result.get("reason") or "Could not send the email. Download the full report instead.",
+        }
+    return {"ok": True, "sent": True, "smtp_configured": True}
 
 
 @router.get("/runs/{run_id}/report")
@@ -127,8 +185,6 @@ def download_report(run_id: int, db: Session = Depends(get_db)):
     run = db.get(ResearchRun, run_id)
     if not run:
         raise HTTPException(404, "Not found")
-    if run.status not in ("completed", "failed"):
-        raise HTTPException(400, "Search is still running")
     company = (
         db.query(Company)
         .filter(Company.run_id == run_id)
@@ -136,7 +192,7 @@ def download_report(run_id: int, db: Session = Depends(get_db)):
         .first()
     )
     if not company:
-        raise HTTPException(400, "Report is not ready yet")
+        raise HTTPException(400, "The report is not ready yet.")
     fi = _json(company.fact_inference) if company.fact_inference else {}
     if not isinstance(fi, dict):
         fi = {}
@@ -147,10 +203,10 @@ def download_report(run_id: int, db: Session = Depends(get_db)):
     db.commit()
     html = brief.get("html")
     if not html:
-        raise HTTPException(400, "Report is not ready yet")
+        raise HTTPException(400, "The report could not be built. Try the analysis again.")
     safe = "".join(c if c.isalnum() else "-" for c in (company.name or "northline"))[:40]
     return Response(
-        content=html,
+        content=html.encode("utf-8"),
         media_type="text/html; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{safe}-northline-report.html"'},
     )
@@ -191,10 +247,13 @@ def list_runs(db: Session = Depends(get_db), x_admin_pin: str | None = Header(de
 
 
 @router.get("/runs/{run_id}")
-def get_run(run_id: int, db: Session = Depends(get_db)):
+def get_run(run_id: int, db: Session = Depends(get_db), x_admin_pin: str | None = Header(default=None)):
     run = db.get(ResearchRun, run_id)
     if not run:
         raise HTTPException(404, "Run not found")
+    kind = getattr(run, "kind", None) or "outbound"
+    if kind != "search" and not _admin_ok(x_admin_pin):
+        raise HTTPException(403, "Admin only")
     companies = (
         db.query(Company)
         .filter(Company.run_id == run_id)
@@ -202,17 +261,15 @@ def get_run(run_id: int, db: Session = Depends(get_db)):
         .all()
     )
     parsed = _json(run.parsed_icp)
-    brief = None
     fi = {}
     if companies:
         fi = _json(companies[0].fact_inference) if companies[0].fact_inference else {}
-        if isinstance(fi, dict):
-            brief = fi.get("brief")
-        else:
+        if not isinstance(fi, dict):
             fi = {}
     result = None
     if companies:
         c = companies[0]
+        diagnosis = fi.get("diagnosis") if isinstance(fi.get("diagnosis"), dict) else {}
         result = {
             "name": c.name,
             "observed": c.observed_problem,
@@ -221,23 +278,40 @@ def get_run(run_id: int, db: Session = Depends(get_db)):
             "offer": c.automation_opportunity,
             "emailed": bool(fi.get("emailed")) if isinstance(fi, dict) else False,
             "doing_it_right": fi.get("doing_it_right") if isinstance(fi, dict) else [],
+            "peers_status": fi.get("peers_status"),
             "confidence": c.confidence,
             "source": fi.get("source") if isinstance(fi, dict) else None,
             "channel": fi.get("channel") if isinstance(fi, dict) else None,
+            "diagnosis": diagnosis,
+            "industry": (fi.get("industry") if isinstance(fi, dict) else None) or c.industry,
+        }
+    if kind == "search":
+        return {
+            "id": run.id,
+            "kind": kind,
+            "status": run.status,
+            "error": run.error,
+            "progress": parsed.get("stage") if isinstance(parsed, dict) else None,
+            "result": result,
+            "smtp_configured": smtp_ready(),
+            "booking_url": (settings.booking_url or "").strip(),
+            "contact_email": (settings.contact_email or "").strip(),
         }
     return {
         **_run_summary(run),
         "progress": parsed.get("stage") if isinstance(parsed, dict) else None,
-        "brief": brief,
         "result": result,
         "parsed_icp": parsed,
         "companies": [_company_row(c) for c in companies],
         "email_sending_enabled": settings.email_sending_enabled,
+        "smtp_configured": smtp_ready(),
     }
 
 
 @router.get("/runs/{run_id}/logs")
-def get_logs(run_id: int, db: Session = Depends(get_db)):
+def get_logs(run_id: int, db: Session = Depends(get_db), x_admin_pin: str | None = Header(default=None)):
+    if not _admin_ok(x_admin_pin):
+        raise HTTPException(403, "Admin only")
     logs = (
         db.query(EventLog)
         .filter(EventLog.run_id == run_id)
@@ -257,7 +331,9 @@ def get_logs(run_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/runs/{run_id}/export.csv")
-def export_csv(run_id: int, db: Session = Depends(get_db)):
+def export_csv(run_id: int, db: Session = Depends(get_db), x_admin_pin: str | None = Header(default=None)):
+    if not _admin_ok(x_admin_pin):
+        raise HTTPException(403, "Admin only")
     run = db.get(ResearchRun, run_id)
     if not run:
         raise HTTPException(404, "Run not found")
@@ -270,7 +346,9 @@ def export_csv(run_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/prospects/{company_id}")
-def get_prospect(company_id: int, db: Session = Depends(get_db)):
+def get_prospect(company_id: int, db: Session = Depends(get_db), x_admin_pin: str | None = Header(default=None)):
+    if not _admin_ok(x_admin_pin):
+        raise HTTPException(403, "Admin only")
     company = db.get(Company, company_id)
     if not company:
         raise HTTPException(404, "Prospect not found")
@@ -287,7 +365,9 @@ def get_prospect(company_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/prospects/{company_id}/decision")
-def decide(company_id: int, payload: StatusRequest, db: Session = Depends(get_db)):
+def decide(company_id: int, payload: StatusRequest, db: Session = Depends(get_db), x_admin_pin: str | None = Header(default=None)):
+    if not _admin_ok(x_admin_pin):
+        raise HTTPException(403, "Admin only")
     company = db.get(Company, company_id)
     if not company:
         raise HTTPException(404, "Prospect not found")
@@ -311,7 +391,9 @@ def decide(company_id: int, payload: StatusRequest, db: Session = Depends(get_db
 
 
 @router.post("/prospects/{company_id}/feedback")
-def feedback(company_id: int, payload: FeedbackRequest, db: Session = Depends(get_db)):
+def feedback(company_id: int, payload: FeedbackRequest, db: Session = Depends(get_db), x_admin_pin: str | None = Header(default=None)):
+    if not _admin_ok(x_admin_pin):
+        raise HTTPException(403, "Admin only")
     company = db.get(Company, company_id)
     if not company:
         raise HTTPException(404, "Prospect not found")

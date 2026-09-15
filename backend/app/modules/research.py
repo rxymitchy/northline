@@ -1,5 +1,6 @@
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
 
@@ -42,7 +43,7 @@ def research_company(run_id: int, company: dict, quick: bool = False) -> dict:
     if not start_url:
         return {"ok": False, "reason": "No URL to research"}
 
-    timeout = 8 if quick else settings.fetch_timeout_seconds
+    timeout = 4 if quick else settings.fetch_timeout_seconds
     pages: list[dict] = []
     try:
         homepage = _fetch_page(start_url, timeout=timeout, skip_robots=quick)
@@ -113,6 +114,203 @@ def research_company(run_id: int, company: dict, quick: bool = False) -> dict:
     }
 
 
+VISITOR_BUDGET_SECONDS = 12.0
+_WALLED_SOCIAL = (
+    "facebook.com",
+    "fb.com",
+    "instagram.com",
+    "linkedin.com",
+    "tiktok.com",
+    "twitter.com",
+    "x.com",
+    "threads.net",
+)
+
+
+def visitor_research(run_id: int, name: str, url: str, description: str) -> dict:
+    """Homepage + public web mentions in parallel, capped so diagnosis stays under ~15s."""
+    deadline = time.monotonic() + VISITOR_BUDGET_SECONDS
+    name = (name or "").strip()
+    url = (url or "").strip()
+    description = (description or "").strip()
+    skip_home = not url or _is_walled_social(url)
+
+    homepage = None
+    mentions: list[dict] = []
+
+    def _home() -> dict | None:
+        if skip_home:
+            return None
+        return _fetch_page_safe(url, 4)
+
+    def _search() -> list[dict]:
+        return _public_mentions(name, url, description)
+
+    pool = ThreadPoolExecutor(max_workers=2)
+    try:
+        home_f = pool.submit(_home)
+        search_f = pool.submit(_search)
+        try:
+            homepage = home_f.result(timeout=min(5.0, max(0.2, deadline - time.monotonic())))
+        except Exception as exc:
+            log_event(run_id, "fetch_error", f"Homepage timed out or failed: {exc}", level="warning")
+            homepage = None
+        try:
+            mentions = search_f.result(timeout=min(5.0, max(0.2, deadline - time.monotonic()))) or []
+        except Exception as exc:
+            log_event(run_id, "search_error", f"Public mentions search skipped: {exc}", level="warning")
+            mentions = []
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+
+    pages: list[dict] = []
+    if homepage:
+        pages.append(homepage)
+
+    if homepage and time.monotonic() < deadline - 1.2:
+        extra_urls = _candidate_paths(homepage, _origin(homepage.get("url") or url))[:2]
+        remain = max(0.3, deadline - time.monotonic())
+        extra_pool = ThreadPoolExecutor(max_workers=2)
+        try:
+            futures = [extra_pool.submit(_fetch_page_safe, extra, 3) for extra in extra_urls]
+            try:
+                for fut in as_completed(futures, timeout=remain):
+                    page = fut.result()
+                    if page:
+                        pages.append(page)
+            except Exception:
+                pass
+        finally:
+            extra_pool.shutdown(wait=False, cancel_futures=True)
+
+    if not pages and mentions and time.monotonic() < deadline - 1:
+        from app.modules.page_type import host_of, is_publisher_host
+
+        for row in mentions:
+            href = (row.get("url") or "").strip()
+            if not href or _is_walled_social(href):
+                continue
+            if is_publisher_host(host_of(href)):
+                continue
+            page = _fetch_page_safe(href, 3)
+            if page:
+                pages.append(page)
+                break
+
+    mention_block = _format_mentions(mentions)
+    own_host = ""
+    if url:
+        own_host = urlparse(url).netloc.replace("www.", "").lower()
+    elif pages:
+        own_host = urlparse(pages[0]["url"]).netloc.replace("www.", "").lower()
+
+    if not pages and not description and not mention_block:
+        return {"ok": False, "reason": "Could not read a public page or mentions for this company yet."}
+
+    combined_text = "\n\n".join(p["text"] for p in pages)
+    if description:
+        combined_text = (description + "\n\n" + combined_text).strip()
+    if mention_block:
+        combined_text = (combined_text + "\n\n" + mention_block).strip()
+    combined_text = combined_text[:14000]
+    combined_html = "\n".join(p.get("html_sample", "") for p in pages)
+    signals = _extract_signals(combined_text + "\n" + combined_html)
+
+    own_pages = [p for p in pages if not own_host or urlparse(p["url"]).netloc.replace("www.", "").lower() == own_host]
+    if not own_pages:
+        own_pages = pages
+    emails = _unique(sum((p["emails"] for p in own_pages), []))
+    email_records = sum((p.get("email_records") or [] for p in own_pages), [])
+    phones = _unique(sum((p["phones"] for p in own_pages), []))
+    whatsapps = _unique(sum((p["whatsapps"] for p in own_pages), []))
+    if whatsapps:
+        signals["whatsapp_channel"] = True
+        for wa in whatsapps:
+            m = re.search(r"(?:wa\.me|whatsapp\.com/send\?phone=)/?(\d{10,15})", wa)
+            if m:
+                phones.append(_clean_phone("+" + m.group(1) if not m.group(1).startswith("0") else m.group(1)))
+        phones = _unique(phones)
+    people = sum((p["people"] for p in own_pages), [])
+    website = None
+    if pages:
+        website = _origin(pages[0]["url"])
+    elif url and not skip_home:
+        website = url
+
+    return {
+        "ok": True,
+        "website": website,
+        "pages": [{"url": p["url"], "title": p.get("title") or ""} for p in pages],
+        "text": combined_text,
+        "signals": signals,
+        "emails": emails,
+        "email_records": email_records,
+        "phones": phones,
+        "whatsapps": whatsapps,
+        "people": people,
+        "meta_description": (pages[0].get("description") if pages else None),
+        "public_mentions": mentions[:8],
+    }
+
+
+def _is_walled_social(url: str) -> bool:
+    host = urlparse(url or "").netloc.lower().replace("www.", "")
+    return any(host == h or host.endswith("." + h) for h in _WALLED_SOCIAL)
+
+
+def _fetch_page_safe(url: str, timeout: int | float) -> dict | None:
+    try:
+        return _fetch_page(url, timeout=max(1, int(timeout)), skip_robots=True)
+    except Exception:
+        return None
+
+
+def _public_mentions(name: str, url: str, description: str) -> list[dict]:
+    from app.providers.factory import get_search_provider
+
+    host = urlparse(url or "").netloc.replace("www.", "")
+    parts = [name, host]
+    if not host and description:
+        parts.extend(description.split()[:5])
+    query = " ".join(p for p in parts if p).strip()
+    if len(query) < 3:
+        return []
+    try:
+        rows = get_search_provider().search(query, max_results=6)
+    except Exception:
+        return []
+    out: list[dict] = []
+    seen: set[str] = set()
+    for row in rows:
+        href = (getattr(row, "url", None) or "").strip()
+        if not href or href in seen:
+            continue
+        seen.add(href)
+        out.append(
+            {
+                "title": (getattr(row, "title", None) or "")[:200],
+                "url": href,
+                "snippet": (getattr(row, "snippet", None) or "")[:400],
+                "host": urlparse(href).netloc.replace("www.", ""),
+            }
+        )
+        if len(out) >= 6:
+            break
+    return out
+
+
+def _format_mentions(mentions: list[dict]) -> str:
+    if not mentions:
+        return ""
+    lines = ["PUBLIC MENTIONS (web search, not only the submitted link):"]
+    for row in mentions:
+        title = (row.get("title") or "").strip()
+        snippet = (row.get("snippet") or "").strip()
+        href = (row.get("url") or "").strip()
+        lines.append(f"- {title} — {snippet} ({href})")
+    return "\n".join(lines)
+
+
 def _fetch_page(url: str, timeout: int | None = None, skip_robots: bool = False) -> dict | None:
     if not skip_robots and not _allowed(url):
         return None
@@ -121,7 +319,7 @@ def _fetch_page(url: str, timeout: int | None = None, skip_robots: bool = False)
         response = http_get(url, timeout=wait)
     except Exception as exc:
         if "aswMonFltProxy" in str(exc) or getattr(exc, "errno", None) == 13:
-            response = http_get(url, timeout=wait)
+            response = http_get(url, timeout=min(float(wait), 4.0))
         else:
             raise
     status = getattr(response, "status_code", 0)

@@ -6,63 +6,76 @@
   <title>Northline</title>
   <style>
     :root {
-      --bg: #fafbfc;
-      --ink: #111827;
-      --mute: #6b7280;
-      --line: #e5e7eb;
-      --blue: #2563eb;
-      --blue-hover: #1d4ed8;
+      --bg: #f7f7f5;
+      --ink: #171717;
+      --mute: #5c5c5c;
+      --line: #e4e4e0;
+      --blue: #1d4ed8;
+      --blue-hover: #1e40af;
       --card: #fff;
+      --high: #9a3412;
+      --med: #854d0e;
+      --low: #3f6212;
     }
     * { box-sizing: border-box; }
-    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 16px/1.5 ui-sans-serif, system-ui, Segoe UI, sans-serif; }
-    .page { max-width: 640px; margin: 0 auto; padding: 10vh 20px 80px; }
-    h1 { font-size: clamp(26px, 4vw, 34px); font-weight: 650; letter-spacing: -.03em; line-height: 1.25; margin: 0 0 10px; text-align: center; }
-    .brand { text-align: center; font-size: 13px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--blue); margin: 0 0 16px; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 16px/1.55 ui-sans-serif, system-ui, Segoe UI, sans-serif; }
+    .page { max-width: 680px; margin: 0 auto; padding: 8vh 20px 88px; }
+    h1 { font-size: clamp(26px, 4vw, 34px); font-weight: 650; letter-spacing: -.03em; line-height: 1.2; margin: 0 0 10px; text-align: center; }
+    .brand { text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--blue); margin: 0 0 14px; }
     .slogan { text-align: center; color: var(--mute); margin: 0 0 28px; font-size: 15px; }
     .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
     .choice {
       border: 1px solid var(--line);
       background: var(--card);
-      border-radius: 12px;
+      border-radius: 10px;
       padding: 14px 12px;
       text-align: center;
       cursor: pointer;
       font-size: 14px;
       font-weight: 600;
     }
-    .choice:hover, .choice.on { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    .choice:hover, .choice.on { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(29,78,216,.12); }
     label { display: block; font-size: 13px; color: var(--mute); margin: 12px 0 6px; }
     input, textarea {
       width: 100%;
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 10px;
       padding: 12px 14px;
       font: inherit;
       background: #fff;
     }
     textarea { min-height: 120px; resize: vertical; }
-    input:focus, textarea:focus { outline: 2px solid rgba(37,99,235,.35); border-color: var(--blue); }
+    input:focus, textarea:focus { outline: 2px solid rgba(29,78,216,.3); border-color: var(--blue); }
     .btn {
       display: inline-flex; align-items: center; justify-content: center;
-      min-height: 44px; padding: 0 22px; border-radius: 10px; border: 0;
+      min-height: 46px; padding: 0 22px; border-radius: 10px; border: 0;
       font: 600 15px/1 inherit; cursor: pointer;
     }
     .btn.primary { background: var(--blue); color: #fff; width: 100%; margin-top: 18px; }
     .btn.primary:hover { background: var(--blue-hover); }
-    .btn.primary:disabled { opacity: .5; cursor: default; }
-    .btn.ghost { background: #fff; color: var(--blue); border: 1px solid var(--blue); width: 100%; margin-top: 12px; }
+    .btn.primary:disabled, .btn.ghost:disabled { opacity: .5; cursor: default; }
+    .btn.ghost { background: #fff; color: var(--blue); border: 1px solid var(--blue); width: 100%; margin-top: 10px; text-decoration: none; }
     .err { color: #b91c1c; font-size: 14px; text-align: center; min-height: 20px; margin-top: 10px; }
+    .ok { color: #166534; }
     .hidden { display: none !important; }
-    .stage { text-align: center; color: var(--mute); margin: 24px 0; }
+    .stage { text-align: center; color: var(--mute); margin: 20px 0 8px; }
+    .hint { text-align: center; color: var(--mute); font-size: 13px; margin: 0 0 18px; }
     .cards { display: flex; flex-direction: column; gap: 14px; }
-    .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px 18px 16px; }
-    .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--mute); margin: 0 0 8px; font-weight: 700; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 18px 16px; }
+    .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--mute); margin: 0 0 10px; font-weight: 700; }
     .card p { margin: 0; }
-    .card ul { margin: 0; padding-left: 18px; }
+    .card ul { margin: 8px 0 0; padding-left: 18px; }
     .card li { margin: 6px 0; }
+    .sev { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .08em; padding: 4px 8px; border-radius: 6px; }
+    .sev.HIGH { background: #ffedd5; color: var(--high); }
+    .sev.MEDIUM { background: #fef9c3; color: var(--med); }
+    .sev.LOW { background: #ecfccb; color: var(--low); }
+    .ops { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+    .ops th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--mute); padding: 6px 8px 8px 0; border-bottom: 1px solid var(--line); }
+    .ops td { vertical-align: top; padding: 10px 10px 10px 0; border-bottom: 1px solid var(--line); }
+    .flow { font-size: 14px; letter-spacing: .01em; }
     .peer { display: block; padding: 12px 0; border-top: 1px solid var(--line); text-decoration: none; color: inherit; }
-    .peer:first-child { border-top: 0; }
+    .peer:first-of-type { border-top: 0; }
     .peer b { color: var(--blue); }
     .peer span { display: block; color: var(--mute); font-size: 13px; margin-top: 4px; }
     .lock {
@@ -70,7 +83,11 @@
       border-radius: 10px; border: 1px solid var(--line); background: #fff;
       cursor: pointer; color: var(--mute); font-size: 16px;
     }
-    .note { text-align: center; color: var(--mute); font-size: 14px; margin-top: 10px; }
+    .note { text-align: center; font-size: 14px; margin-top: 12px; color: var(--mute); }
+    .note.bad { color: #b91c1c; }
+    .note.good { color: #166534; }
+    .caveat { color: var(--mute); font-size: 13px; margin-top: 10px; }
+    .actions { margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -78,7 +95,7 @@
     <form id="form">
       <p class="brand">Northline</p>
       <h1>Manual work is quietly ruining the company</h1>
-      <p class="slogan">Show us the website, the socials, a file, or describe the process.</p>
+      <p class="slogan">Show how work comes in. Northline will say what still depends on a person — and what to automate first.</p>
       <div class="choices">
         <button type="button" class="choice on" data-source="website">Website</button>
         <button type="button" class="choice" data-source="social">Social media</button>
@@ -101,16 +118,19 @@
       <input id="name" type="text" autocomplete="name" required />
       <label for="email">Email</label>
       <input id="email" type="email" autocomplete="email" required />
-      <button class="btn primary" id="searchBtn" type="submit">Search</button>
+      <button class="btn primary" id="searchBtn" type="submit">See the diagnosis</button>
       <p class="err" id="err"></p>
     </form>
 
     <div id="live" class="hidden">
-      <p class="stage" id="stage">Looking at how you work. This usually takes under a minute…</p>
+      <p class="stage" id="stage">Checking public pages and web mentions…</p>
+      <p class="hint" id="hint">Looking at your site plus public mentions of the company. Usually 10–20 seconds.</p>
       <div id="results" class="cards hidden"></div>
-      <button class="btn primary hidden" id="emailBtn" type="button">Email me the full report</button>
-      <button class="btn ghost hidden" id="downloadBtn" type="button">Download the full report</button>
-      <button class="btn ghost hidden" id="betterBtn" type="button">See similar companies doing it right</button>
+      <div class="actions">
+        <button class="btn primary hidden" id="downloadBtn" type="button">Download the full report</button>
+        <button class="btn ghost hidden" id="betterBtn" type="button">See companies in this industry</button>
+        <a class="btn ghost hidden" id="helpBtn" href="#" target="_blank" rel="noopener">Schedule a 20-minute call</a>
+      </div>
       <div id="peers" class="card hidden" style="margin-top:16px"></div>
       <p class="note" id="note"></p>
     </div>
@@ -120,6 +140,8 @@
 let source = "website";
 let runId = null;
 let poll = null;
+let bookingUrl = "";
+let contactEmail = "";
 document.querySelectorAll(".choice").forEach(btn => {
   btn.onclick = () => {
     source = btn.dataset.source;
@@ -134,9 +156,14 @@ document.getElementById("form").onsubmit = async (e) => {
   e.preventDefault();
   const err = document.getElementById("err");
   err.textContent = "";
+  const email = document.getElementById("email").value.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    err.textContent = "Enter a valid email address.";
+    return;
+  }
   const fd = new FormData();
   fd.append("name", document.getElementById("name").value.trim());
-  fd.append("email", document.getElementById("email").value.trim());
+  fd.append("email", email);
   fd.append("source", source);
   fd.append("url", document.getElementById("url").value.trim());
   fd.append("description", document.getElementById("description").value.trim());
@@ -150,7 +177,8 @@ document.getElementById("form").onsubmit = async (e) => {
     runId = data.id;
     document.getElementById("form").classList.add("hidden");
     document.getElementById("live").classList.remove("hidden");
-    document.getElementById("stage").textContent = "Looking at how you work. This usually takes under a minute…";
+    document.getElementById("stage").textContent = "Checking public pages and web mentions…";
+    document.getElementById("hint").textContent = "Looking at your site plus public mentions of the company. Usually 10–20 seconds.";
     watch();
   } catch (ex) {
     err.textContent = ex.message;
@@ -163,11 +191,14 @@ function watch(){
     const r = await fetch("/api/runs/"+runId);
     if (!r.ok) return;
     const d = await r.json();
+    bookingUrl = d.booking_url || "";
+    contactEmail = d.contact_email || "";
+    const p = d.progress || "Checking public pages and web mentions…";
     if (d.status==="completed") {
-      document.getElementById("stage").textContent = "Your snapshot";
+      document.getElementById("stage").textContent = "Business operations snapshot";
+      document.getElementById("hint").textContent = "";
     } else {
-      const p = d.progress || "Looking at how you work.";
-      document.getElementById("stage").textContent = p.toLowerCase().includes("minute") ? p : (p + " This usually takes under a minute…");
+      document.getElementById("stage").textContent = p;
     }
     if (d.result && d.status==="completed") {
       renderResult(d.result);
@@ -175,7 +206,10 @@ function watch(){
     }
     if (d.status==="failed") {
       document.getElementById("stage").textContent = "Could not finish";
-      document.getElementById("note").textContent = d.error || "Try another option.";
+      document.getElementById("hint").textContent = "";
+      document.getElementById("note").className = "note bad";
+      document.getElementById("note").textContent = d.error || "Try another option, or add a little more detail.";
+      if (d.result) renderResult(d.result);
       clearInterval(poll);
     }
   };
@@ -183,79 +217,115 @@ function watch(){
   poll = setInterval(tick, 1500);
 }
 function renderResult(res){
-  const facts = (res.facts||[]).filter(Boolean);
-  const gaps = (res.gaps||[]).filter(Boolean);
+  const dx = res.diagnosis || {};
+  const processes = dx.processes || [];
+  const automate = dx.automate_first || {};
+  const workflow = dx.workflow || [];
   const ch = res.channel || {};
-  const missing = (ch.missing||[]).filter(Boolean);
-  const explore = (ch.explore||[]).filter(Boolean);
-  const src = res.source || source;
-  const commentTitle = {
-    website: "Comment on your website",
-    social: "Comment on this profile",
-    csv: "Comment on this file",
-    describe: "Comment on how you work"
-  }[src] || "Comment on what you sent";
-  const extraTitle = src === "social" ? "Other apps and extra suggestions" : "Extra suggestions";
+  const overall = dx.overall || "LOW";
+  const facts = (automate.evidence || res.facts || []).filter(Boolean);
+  const explore = (ch.explore || []).filter(Boolean);
   document.getElementById("results").classList.remove("hidden");
   document.getElementById("results").innerHTML = `
-    <div class="card"><h2>What looks manual</h2><p>${esc(res.observed || "We could not see a clear public process yet.")}</p></div>
-    <div class="card"><h2>${esc(commentTitle)}</h2><p>${esc(ch.state || "We read what you sent and mapped the process we could see.")}</p>
-      ${missing.length ? "<p style='margin-top:10px'><b>What’s missing</b></p><ul>"+missing.map(g=>"<li>"+esc(g)+"</li>").join("")+"</ul>" : ""}
-      ${explore.length ? "<p style='margin-top:10px'><b>"+esc(extraTitle)+"</b></p><ul>"+explore.map(g=>"<li>"+esc(g)+"</li>").join("")+"</ul>" : ""}</div>
-    <div class="card"><h2>Where time is leaking</h2>${gaps.length ? "<ul>"+gaps.map(g=>"<li>"+esc(g)+"</li>").join("")+"</ul>" : "<p>No strong public gap — the report still captures what we saw.</p>"}</div>
-    <div class="card"><h2>What we would automate first</h2><p>${esc(res.offer || "The hand-offs that still wait on a person.")}</p>
-      ${facts.length ? "<ul>"+facts.map(f=>"<li>"+esc(f)+"</li>").join("")+"</ul>" : ""}</div>`;
-  document.getElementById("emailBtn").classList.remove("hidden");
-  document.getElementById("emailBtn").onclick = emailReport;
-  document.getElementById("downloadBtn").classList.remove("hidden");
-  document.getElementById("downloadBtn").onclick = downloadReport;
+    <div class="card">
+      <h2>Business operations snapshot</h2>
+      <p>Overall manual dependency: <span class="sev ${esc(overall)}">${esc(dx.overall_label || overall)}</span></p>
+      <p style="margin-top:10px">${esc(dx.summary || res.observed || "Northline could not see a clear public process yet.")}</p>
+      ${processes.length ? `<table class="ops"><thead><tr><th>Process</th><th>Current human work</th><th>Priority</th><th>Why it matters</th></tr></thead><tbody>${
+        processes.map(p => `<tr><td>${esc(p.process)}</td><td>${esc(p.human_work)}</td><td>${esc(p.priority)}</td><td>${esc(p.why)}</td></tr>`).join("")
+      }</tbody></table>` : ""}
+    </div>
+    <div class="card">
+      <h2>What to automate first</h2>
+      <p><b>${esc(automate.title || "The first handoff")}</b></p>
+      <p style="margin-top:8px">${esc(automate.reason || res.offer || "Northline did not see a single dominant public bottleneck.")}</p>
+      ${facts.length ? "<ul>"+facts.map(f=>"<li>"+esc(f)+"</li>").join("")+"</ul>" : ""}
+    </div>
+    <div class="card">
+      <h2>Suggested workflow</h2>
+      <p class="flow">${esc((workflow.length ? workflow : ["Incoming enquiry","capture","follow-up","human handoff when needed"]).join(" → "))}</p>
+      ${explore.length ? "<p style='margin-top:12px'><b>Could be worth exploring</b></p><ul>"+explore.map(g=>"<li>"+esc(g)+"</li>").join("")+"</ul>" : ""}
+            <p class="caveat">${esc(dx.caveat || "Based on the information provided. Northline does not invent internal processes.")}</p>
+    </div>
+    <div class="card" id="helpCard">
+      <h2>Want Northline to help with this?</h2>
+      <p>You already left your email. If you want help implementing the workflow above, book a short call. This is one next step, not a second product.</p>
+      <p id="helpStatus" class="caveat" style="margin-top:10px"></p>
+    </div>`;
+  const downloadBtn = document.getElementById("downloadBtn");
+  downloadBtn.classList.remove("hidden");
   document.getElementById("betterBtn").classList.remove("hidden");
+  downloadBtn.onclick = downloadReport;
   document.getElementById("betterBtn").onclick = findBetter;
+  const help = document.getElementById("helpBtn");
+  help.classList.remove("hidden");
+  help.textContent = "Schedule a 20-minute call";
+  if (bookingUrl) {
+    help.href = bookingUrl;
+    help.onclick = () => { askForHelp(false); };
+  } else if (contactEmail) {
+    help.href = "mailto:" + contactEmail + "?subject=" + encodeURIComponent("Help implementing the Northline workflow");
+    help.onclick = () => { askForHelp(false); };
+  } else {
+    help.removeAttribute("target");
+    help.href = "#helpCard";
+    help.onclick = (ev) => { ev.preventDefault(); askForHelp(true); };
+  }
+  setNote("We saved your name and email when you started. Download the snapshot, or see companies in this industry.", "");
 }
-async function emailReport(){
-  const btn = document.getElementById("emailBtn");
-  btn.disabled = true;
-  document.getElementById("note").textContent = "";
+function setNote(text, kind){
+  const el = document.getElementById("note");
+  el.textContent = text;
+  el.className = "note" + (kind === "bad" ? " bad" : kind === "good" ? " good" : "");
+}
+async function askForHelp(showSaved){
   try {
-    const r = await fetch("/api/runs/"+runId+"/email", {method:"POST"});
+    const r = await fetch("/api/runs/"+runId+"/help", {method:"POST"});
     const data = await r.json().catch(()=>({}));
-    if (!r.ok) throw new Error(typeof data.detail==="string" ? data.detail : "Could not send yet");
-    document.getElementById("note").textContent = "Sent. Check your inbox.";
+    const status = document.getElementById("helpStatus");
+    if (status) status.textContent = data.message || "We noted that you want help.";
+    if (showSaved) setNote("We’ll follow up on the email you already gave us.", "good");
   } catch (ex) {
-    document.getElementById("note").textContent = ex.message + " Download the full report below if email is not working.";
-    btn.disabled = false;
+    setNote("Could not save that request. Download the report and email us separately.", "bad");
   }
 }
 function downloadReport(){
+  setNote("Your browser should start the download. If it does not, check pop-up or download settings.", "");
   window.location.href = "/api/runs/"+runId+"/report";
 }
 async function findBetter(){
   const btn = document.getElementById("betterBtn");
   btn.disabled = true;
-  document.getElementById("stage").textContent = "Finding companies doing better…";
+  document.getElementById("stage").textContent = "Looking for companies in this industry…";
+  document.getElementById("hint").textContent = "We skip blogs and listicles. This can take a short while.";
   await fetch("/api/runs/"+runId+"/better", {method:"POST"});
   const started = Date.now();
   const t = setInterval(async () => {
     const r = await fetch("/api/runs/"+runId);
     const d = await r.json();
     const peers = (d.result && d.result.doing_it_right) || [];
-    if (peers.length || Date.now()-started > 45000) {
+    const status = d.result && d.result.peers_status;
+    const industry = (d.result && d.result.industry) || "";
+    if (status === "ready" || status === "empty" || Date.now()-started > 55000) {
       clearInterval(t);
-      document.getElementById("stage").textContent = "Companies doing better";
-      showPeers(peers);
+      document.getElementById("stage").textContent = "Business operations snapshot";
+      document.getElementById("hint").textContent = "";
+      showPeers(peers, industry);
       btn.disabled = false;
-      if (peers.length) {
-        document.getElementById("note").textContent = "These companies are now in the full report. Download or email it again to keep them.";
-      }
+      if (peers.length) setNote("These companies are now included if you download the report again.", "good");
     }
   }, 1500);
 }
-function showPeers(peers){
+function showPeers(peers, industry){
   const box = document.getElementById("peers");
   box.classList.remove("hidden");
-  if (!peers.length) { box.innerHTML = "<h2>Companies doing better</h2><p>None turned up on this pass. Try again in a moment.</p>"; return; }
-  box.innerHTML = "<h2>Companies like you, further along</h2>" + peers.map(p =>
-    `<a class="peer" href="${esc(p.website)}" target="_blank" rel="noopener"><b>${esc(p.name)}</b><span>${esc(p.snippet||"")}</span></a>`
+  const label = industry ? "Companies in " + industry : "Companies in this industry";
+  if (!peers.length) {
+    box.innerHTML = "<h2>"+esc(label)+"</h2><p>Search did not return enough company sites this time. Try again in a moment — we do not invent businesses to fill the list.</p>";
+    return;
+  }
+  box.innerHTML = "<h2>"+esc(label)+"</h2><p class='caveat' style='margin-bottom:8px'>Public company sites in a related space. If we cannot see automation on the homepage, we say so.</p>" + peers.map(p =>
+    `<a class="peer" href="${esc(p.website)}" target="_blank" rel="noopener"><b>${esc(p.name)}</b><span>${esc(p.why || p.snippet || "")}</span></a>`
   ).join("");
 }
 async function openAdmin(){

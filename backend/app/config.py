@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     outbound_send_delay_seconds: float = 4.0
 
     admin_pin: str = "northline"
+    booking_url: str = ""
+    contact_email: str = ""
     openai_input_cost_per_1m: float = 0.15
     openai_output_cost_per_1m: float = 0.60
 

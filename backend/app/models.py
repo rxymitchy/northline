@@ -40,6 +40,7 @@ class Inquiry(Base):
     email: Mapped[str] = mapped_column(String(200))
     source_kind: Mapped[str] = mapped_column(String(40))
     source_value: Mapped[str] = mapped_column(Text, default="")
+    wants_help: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 

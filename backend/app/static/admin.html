@@ -23,7 +23,11 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>Admin hunt</h1>
+    <h1>Admin</h1>
+    <p>Visitor leads are captured when someone clicks See the diagnosis. The hunt below is separate.</p>
+    <h2 style="font-size:16px;margin:22px 0 8px">Visitor leads</h2>
+    <table><thead><tr><th>When</th><th>Name</th><th>Email</th><th>Source</th><th>Help</th></tr></thead><tbody id="leads"></tbody></table>
+    <h2 style="font-size:16px;margin:28px 0 8px">Outbound hunt</h2>
     <p>Find companies with serious automation problems and email public decision-makers we can actually verify.</p>
     <button id="go" type="button">Search companies with automation problems</button>
     <p class="err" id="err"></p>
@@ -35,6 +39,15 @@ const pin = sessionStorage.getItem("adminPin") || "";
 if (!pin) location.href = "/";
 let current = null;
 let poll = null;
+async function loadLeads(){
+  const r = await fetch("/api/leads", {headers: {"X-Admin-Pin": pin}});
+  if (!r.ok) return;
+  const rows = await r.json();
+  document.getElementById("leads").innerHTML = (rows||[]).map(row =>
+    `<tr><td>${esc((row.created_at||"").replace("T"," ").slice(0,16))}</td><td>${esc(row.name)}</td><td>${esc(row.email)}</td><td>${esc(row.source)}</td><td>${row.wants_help ? "wants help" : ""}</td></tr>`
+  ).join("") || "<tr><td colspan='4'>No visitor leads yet.</td></tr>";
+}
+loadLeads();
 document.getElementById("go").onclick = async () => {
   document.getElementById("err").textContent = "";
   document.getElementById("go").disabled = true;
@@ -56,7 +69,7 @@ document.getElementById("go").onclick = async () => {
 function watch(){
   if (poll) clearInterval(poll);
   const tick = async () => {
-    const r = await fetch("/api/runs/"+current);
+    const r = await fetch("/api/runs/"+current, {headers: {"X-Admin-Pin": pin}});
     const d = await r.json();
     document.getElementById("meta").textContent = `Hunt ${d.id} · ${d.status} · ${d.discovered_count} found · ${d.qualified_count} qualified`;
     document.getElementById("rows").innerHTML = (d.companies||[]).map(c =>

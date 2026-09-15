@@ -4,6 +4,8 @@ from app.models import ApiUsage, EventLog
 
 
 def log_event(run_id: int | None, event_type: str, message: str, payload: str = "{}", level: str = "info"):
+    from app.emailer import redact_secrets
+
     db = SessionLocal()
     try:
         db.add(
@@ -11,8 +13,8 @@ def log_event(run_id: int | None, event_type: str, message: str, payload: str = 
                 run_id=run_id,
                 level=level,
                 event_type=event_type,
-                message=message,
-                payload=payload,
+                message=redact_secrets(message),
+                payload=redact_secrets(payload),
             )
         )
         db.commit()

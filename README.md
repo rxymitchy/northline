@@ -6,7 +6,7 @@ Repo: [github.com/rxymitchy/northline](https://github.com/rxymitchy/northline)
 
 Northline looks at how a business actually takes work in — website, social profile, spreadsheet, or a short description — and says what still depends on a person. It is not a generic lead scraper.
 
-Public app: paste how you work, get a snapshot, email or download the full report, then optionally see **real companies** (not blogs or roundups) that are further along. Those companies are written into the report when you download or email it again.
+Public app: paste how you work, get a snapshot, download the full report, then optionally see **real companies** (not blogs or roundups) that are further along. Those companies are included when you download the report again.
 
 A PIN-locked **admin** hunt still finds other businesses with public automation gaps and drafts outreach to **public** emails only. Never invented contacts.
 
@@ -15,12 +15,13 @@ A PIN-locked **admin** hunt still finds other businesses with public automation 
 ## What visitors get
 
 1. Choose **Website**, **Social media**, **Data file / CSV**, or **Describe how you work**.
-2. Add name and email, then **Search**.
-3. On-page snapshot: what looks manual, a comment on *that* channel, extra suggestions (including other apps when you start from social), and what to automate first.
-4. **Email me the full report** (normal SMTP, not Outlook). If mail is not connected, **Download the full report**.
-5. **See similar companies doing it right** — homepages of operating businesses, then download/email again so they are in the file.
+2. Add name and email, then **See the diagnosis**.
+3. Northline reads the page you sent **and** a short public web search for the company (news, directories, other mentions), in parallel, with a hard time cap so this usually finishes in **10–20 seconds**.
+4. On-page snapshot: overall manual dependency, which processes still wait on a person, what to automate first, and a suggested workflow.
+5. **Download the full report**. Optional: ask Northline for help (booking link or a follow-up on the email you already gave).
+6. **See companies in this industry** — operating businesses, not blogs or roundups. Download the report again so they are in the file.
 
-Visitor search stays fast: homepage only, no public contact hunt, no OpenAI on that path.
+Visitor diagnosis stays heuristic: no OpenAI, no invented emails, no login/CAPTCHA bypass. Search is bounded so a slow site or DuckDuckGo cannot hang the page for a minute.
 
 ## Admin hunt
 
@@ -52,6 +53,7 @@ An older Next.js dashboard lives in `frontend/` and talks to the same API. The p
 | `SMTP_PORT` / `SMTP_USE_TLS` | No | Default `587` + TLS |
 | `EMAIL_SENDING_ENABLED` / `OUTBOUND_SEND_ENABLED` | Keep `false` until SMTP works | Cold emails to public contacts |
 | `ADMIN_PIN` | For `/admin` | Unlock the hunt dashboard |
+| `BOOKING_URL` / `CONTACT_EMAIL` | No | Public “help with this” CTA after diagnosis |
 | `OPENAI_API_KEY` | For AI drafts | Admin ICP/outreach; visitor search does not need it |
 | `SEARCH_PROVIDER` | No | `duckduckgo` (free), `tavily`, `serper`, or `brave` |
 | `TAVILY_API_KEY` / `SERPER_API_KEY` / `BRAVE_API_KEY` | If you switch provider | Search APIs |
@@ -67,7 +69,7 @@ Python modules: `backend/app/modules/`. Search providers: `backend/app/providers
 - Public HTML only. No login, CAPTCHA, paywall, or ToS bypass.
 - Similar companies are filtered to operating sites; thin or blocked pages may be skipped.
 - Decision-maker emails are often missing on the admin hunt; marked **CONTACT NOT VERIFIED**. Never fabricated.
-- If SMTP is empty, reports still show on the page and can be downloaded.
+- If SMTP is empty, reports still show on the page and can be downloaded. The public UI leads with download rather than email.
 
 ## Compliance
 
