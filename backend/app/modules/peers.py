@@ -1,3 +1,4 @@
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
 
@@ -10,7 +11,6 @@ from app.modules.page_type import (
     should_skip_search_result,
 )
 from app.modules.research import _fetch_page
-from app.providers.factory import get_search_provider
 
 
 # Product categories first. Broad service words like "beauty" or "shop" come later
@@ -155,7 +155,7 @@ def industry_profile(name: str, research: dict, extra: str = "") -> dict:
     hints = _product_hints(text)
     label = " ".join(hints[:3]) + " company" if hints else "Kenya product brand"
     must = tuple(hints[:6]) or ("kenya",)
-    queries = tuple(f'"{h}" Kenya company' for h in hints[:3]) or ("Kenya manufacturer official website",)
+    queries = tuple(f"{h} Kenya company" for h in hints[:3]) or ("Kenya manufacturer official website", "Kenya brand official website")
     return {
         "label": label.strip(),
         "keys": must,
@@ -165,10 +165,19 @@ def industry_profile(name: str, research: dict, extra: str = "") -> dict:
     }
 
 
-def find_peer_companies(run_id: int, name: str, website: str, research: dict, gap: dict) -> dict:
-    profile = industry_profile(name, research)
-    right = find_better_companies(run_id, name, website, research)
-    return {"industry": profile["label"], "similar": [], "doing_it_right": right}
+PEER_BUDGET_SECONDS = 28.0
+_SKIP_HOSTS = (
+    "facebook.com",
+    "fb.com",
+    "instagram.com",
+    "linkedin.com",
+    "tiktok.com",
+    "twitter.com",
+    "x.com",
+    "youtube.com",
+    "google.com",
+    "maps.google.",
+)
 
 
 def find_better_companies(run_id: int, name: str, website: str, research: dict) -> list[dict]:
@@ -176,47 +185,122 @@ def find_better_companies(run_id: int, name: str, website: str, research: dict) 
     extra = " ".join([research.get("text") or "", website or ""])
     profile = industry_profile(name, research, extra)
     log_event(run_id, "peer_industry", f"Searching {profile['label']}")
-    provider = get_search_provider()
+    deadline = time.monotonic() + PEER_BUDGET_SECONDS
+    queries = _peer_queries(profile, name)
+    hits = _search_many(run_id, queries, deadline)
+    right = _collect_from_hits(run_id, hits, {host} if host else set(), profile, strict=True, deadline=deadline)
+    if len(right) < 3 and time.monotonic() < deadline - 2:
+        extra_hits = _search_many(run_id, _broad_queries(profile), deadline)
+        seen = {urlparse(r.get("website") or "").netloc.lower().replace("www.", "") for r in right}
+        if host:
+            seen.add(host)
+        right.extend(_collect_from_hits(run_id, extra_hits, seen, profile, strict=False, deadline=deadline))
+    return _rank(_dedupe(right))[:6]
+
+
+def _peer_queries(profile: dict, name: str) -> list[str]:
+    label = (profile.get("label") or "Kenya company").strip()
+    must = [m for m in (profile.get("must") or ()) if m][:3]
     queries = list(profile.get("queries") or [])
-    queries.append(f"{profile['label']} Kenya")
-    right: list[dict] = []
-    seen = {host} if host else set()
-    for query in queries:
-        for row in _collect(run_id, provider, query, seen, profile, limit=10):
-            h = urlparse(row.get("website") or "").netloc.lower().replace("www.", "")
-            if not h or h in seen:
-                continue
-            seen.add(h)
-            right.append(row)
-            if len(right) >= 6:
-                return _rank(right)[:6]
-    return _rank(right)[:6]
+    queries.extend(
+        [
+            f"{label} Kenya",
+            f"{label} Nairobi",
+            f"{label} Kenya official website",
+        ]
+    )
+    for word in must:
+        queries.append(f"{word} Kenya company")
+        queries.append(f"{word} Nairobi")
+    if (name or "").strip() and len(name.strip()) > 2:
+        queries.append(f"{name.strip()} similar companies Kenya")
+    out: list[str] = []
+    seen: set[str] = set()
+    for q in queries:
+        key = " ".join((q or "").split()).lower()
+        if key and key not in seen:
+            seen.add(key)
+            out.append(q)
+        if len(out) >= 8:
+            break
+    return out
 
 
-def _collect(run_id: int, provider, query: str, seen_hosts: set[str], profile: dict, limit: int) -> list[dict]:
+def _broad_queries(profile: dict) -> list[str]:
+    label = (profile.get("label") or "").strip()
+    must = (profile.get("must") or ("kenya",))[0]
+    return [
+        f"{must} Kenya official site",
+        f"{label} company website",
+        f"{must} Nairobi -list -top",
+    ]
+
+
+def _search_many(run_id: int, queries: list[str], deadline: float) -> list:
+    from app.providers.factory import get_search_provider
+
+    provider = get_search_provider()
+    rows: list = []
+    remain = max(0.4, deadline - time.monotonic())
+    pool = ThreadPoolExecutor(max_workers=3)
     try:
-        rows = provider.search(query, max_results=12)
-        log_event(run_id, "search", f"peers: {query} → {len(rows)} hits")
-    except Exception as exc:
-        log_event(run_id, "search_error", str(exc), level="warning")
+        futs = {pool.submit(_safe_search, provider, q): q for q in queries[:6]}
+        try:
+            for fut in as_completed(futs, timeout=remain):
+                q = futs[fut]
+                try:
+                    found = fut.result() or []
+                except Exception:
+                    found = []
+                log_event(run_id, "search", f"peers: {q} → {len(found)} hits")
+                rows.extend(found)
+        except Exception:
+            pass
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+    return rows
+
+
+def _safe_search(provider, query: str) -> list:
+    try:
+        return provider.search(query, max_results=12) or []
+    except Exception:
         return []
+
+
+def _collect_from_hits(
+    run_id: int,
+    hits: list,
+    seen_hosts: set[str],
+    profile: dict,
+    strict: bool,
+    deadline: float,
+) -> list[dict]:
     candidates: list[dict] = []
     local_seen = set(seen_hosts)
-    for row in rows:
-        raw = (row.url or "").strip()
+    for row in hits:
+        if time.monotonic() >= deadline:
+            break
+        raw = (getattr(row, "url", None) or "").strip()
         url = homepage_from_article_path(raw)
         host = urlparse(url).netloc.lower().replace("www.", "")
         if not url.startswith("http") or not host or host in local_seen:
             continue
-        title_for_filter = row.title if url == raw else host
-        snippet = (row.snippet or "").strip()[:220]
+        if _skip_host(host):
+            continue
+        title_for_filter = getattr(row, "title", "") if url == raw else host
+        snippet = (getattr(row, "snippet", None) or "").strip()[:220]
         blob = f"{title_for_filter} {snippet} {url}".lower()
         if is_publisher_host(host) or should_skip_search_result(url, title_for_filter, snippet):
             continue
-        if not _on_topic(blob, profile):
+        if strict and not _on_topic(blob, profile, strict=True):
             continue
+        if not strict and not _on_topic(blob, profile, strict=False):
+            # Still skip obvious off-topic rejects.
+            if any(r in blob for r in (profile.get("reject") or ()) if r):
+                continue
         local_seen.add(host)
-        title = (row.title or host).split("|")[0].split(" - ")[0].strip()[:80]
+        title = (getattr(row, "title", None) or host).split("|")[0].split(" - ")[0].strip()[:80]
         candidates.append(
             {
                 "name": title or host,
@@ -227,27 +311,42 @@ def _collect(run_id: int, provider, query: str, seen_hosts: set[str], profile: d
                 "profile": profile,
             }
         )
-        if len(candidates) >= limit + 4:
+        if len(candidates) >= 14:
             break
-    return _verify_companies(run_id, candidates, limit)
+    return _verify_companies(run_id, candidates, 8, deadline)
 
 
-def _verify_companies(run_id: int, candidates: list[dict], limit: int) -> list[dict]:
+def find_peer_companies(run_id: int, name: str, website: str, research: dict, gap: dict) -> dict:
+    profile = industry_profile(name, research)
+    right = find_better_companies(run_id, name, website, research)
+    return {"industry": profile["label"], "similar": [], "doing_it_right": right}
+
+
+def _verify_companies(run_id: int, candidates: list[dict], limit: int, deadline: float | None = None) -> list[dict]:
     if not candidates:
         return []
     kept: list[dict] = []
-    with ThreadPoolExecutor(max_workers=4) as pool:
+    remain = 12.0
+    if deadline is not None:
+        remain = max(0.5, deadline - time.monotonic())
+    pool = ThreadPoolExecutor(max_workers=4)
+    try:
         futures = {pool.submit(_confirm_company, cand): cand for cand in candidates}
-        for fut in as_completed(futures):
-            try:
-                row = fut.result()
-            except Exception:
-                row = None
-            if not row:
-                continue
-            kept.append(row)
-            if len(kept) >= limit:
-                break
+        try:
+            for fut in as_completed(futures, timeout=remain):
+                try:
+                    row = fut.result()
+                except Exception:
+                    row = None
+                if not row:
+                    continue
+                kept.append(row)
+                if len(kept) >= limit:
+                    break
+        except Exception:
+            pass
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
     log_event(run_id, "peer_filter", f"kept {len(kept)} related companies from {len(candidates)} hits")
     return kept[:limit]
 
@@ -258,7 +357,7 @@ def _confirm_company(cand: dict) -> dict | None:
     industry = cand.get("industry") or profile.get("label") or "this space"
     page = None
     try:
-        page = _fetch_page(url, timeout=6, skip_robots=True)
+        page = _fetch_page(url, timeout=5, skip_robots=True)
     except Exception:
         page = None
     if page:
@@ -268,8 +367,9 @@ def _confirm_company(cand: dict) -> dict | None:
         blob = f"{title} {text[:4000]} {cand.get('snippet') or ''}".lower()
         if looks_like_article_page(title, text, url, html[:2500]):
             return None
-        if not _on_topic(blob, profile):
-            return None
+        if not _on_topic(blob, profile, strict=False):
+            if any(r in blob for r in (profile.get("reject") or ()) if r):
+                return None
         final = page.get("url") or url
         name = (title or cand.get("name") or final).split("|")[0].split(" - ")[0].strip()[:80]
         snippet = (page.get("description") or cand.get("snippet") or "").strip()[:220]
@@ -282,8 +382,8 @@ def _confirm_company(cand: dict) -> dict | None:
             "evidence": evidence,
             "kind": cand.get("kind"),
         }
-    # No homepage loaded: keep only if the search snippet already looks on-topic.
-    if not _on_topic(f"{cand.get('name')} {cand.get('snippet')}", profile):
+    snippet_blob = f"{cand.get('name')} {cand.get('snippet')}"
+    if any(r in snippet_blob.lower() for r in (profile.get("reject") or ()) if r) and not _on_topic(snippet_blob, profile, strict=False):
         return None
     return {
         "name": cand.get("name"),
@@ -295,17 +395,38 @@ def _confirm_company(cand: dict) -> dict | None:
     }
 
 
-def _on_topic(blob: str, profile: dict) -> bool:
+def _on_topic(blob: str, profile: dict, strict: bool = True) -> bool:
     low = (blob or "").lower()
     must = [m for m in (profile.get("must") or ()) if m]
+    keys = [k for k in (profile.get("keys") or ()) if k]
     reject = [r for r in (profile.get("reject") or ()) if r]
     must_hits = sum(1 for m in must if m in low)
+    key_hits = sum(1 for k in keys if k in low)
     reject_hits = sum(1 for r in reject if r in low)
-    if reject_hits and must_hits == 0:
+    if reject_hits and must_hits == 0 and key_hits == 0:
         return False
     if must and must_hits == 0:
-        return False
+        if strict:
+            return False
+        return key_hits > 0 or "kenya" in low or "nairobi" in low
     return True
+
+
+def _skip_host(host: str) -> bool:
+    host = (host or "").lower()
+    return any(host == h or host.endswith("." + h) or h in host for h in _SKIP_HOSTS)
+
+
+def _dedupe(rows: list[dict]) -> list[dict]:
+    out: list[dict] = []
+    seen: set[str] = set()
+    for row in rows:
+        host = urlparse(row.get("website") or "").netloc.lower().replace("www.", "")
+        if not host or host in seen:
+            continue
+        seen.add(host)
+        out.append(row)
+    return out
 
 
 def _relevance(blob: str, industry: str, operating: bool, profile: dict) -> tuple[str, list[str]]:
