@@ -4,13 +4,15 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from app.config import settings
 
+DEFAULT_CALENDLY = "https://calendly.com/lucianamitchell19/northline-business-automation"
+
 
 def configured_booking_url() -> str:
-    return _https_url((settings.booking_url or "").strip())
+    return normalize_booking_url((settings.booking_url or "").strip() or DEFAULT_CALENDLY)
 
 
 def calendly_href(base: str, name: str = "", email: str = "") -> str:
-    parsed = urlparse(_https_url(base))
+    parsed = urlparse(normalize_booking_url(base))
     if not parsed.netloc:
         return ""
     query = dict(parse_qsl(parsed.query, keep_blank_values=True))
@@ -26,9 +28,19 @@ def is_calendly(url: str) -> bool:
     return host == "calendly.com" or host.endswith(".calendly.com")
 
 
-def _https_url(raw: str) -> str:
-    url = (raw or "").strip()
+def normalize_booking_url(raw: str) -> str:
+    url = (raw or "").strip().strip("\"'")
+    if not url:
+        return ""
+    if url.startswith("//"):
+        url = "https:" + url
     parsed = urlparse(url)
+    if not parsed.scheme:
+        url = "https://" + url.lstrip("/")
+        parsed = urlparse(url)
+    if parsed.scheme == "http":
+        url = "https://" + url[len("http://") :]
+        parsed = urlparse(url)
     if parsed.scheme != "https" or not parsed.netloc:
         return ""
     return url

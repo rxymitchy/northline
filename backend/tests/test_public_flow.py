@@ -176,17 +176,27 @@ class BookingTests(unittest.TestCase):
     def test_prefills_calendly_name_and_email(self):
         from app.booking import calendly_href, is_calendly
 
-        href = calendly_href("https://calendly.com/northline/20min", "Alex", "alex@example.com")
-        self.assertIn("calendly.com/northline/20min", href)
+        href = calendly_href("https://calendly.com/lucianamitchell19/northline-business-automation", "Alex", "alex@example.com")
+        self.assertIn("calendly.com/lucianamitchell19/northline-business-automation", href)
         self.assertIn("name=Alex", href)
         self.assertIn("email=alex%40example.com", href)
         self.assertTrue(is_calendly(href))
 
-    def test_rejects_non_https(self):
+    def test_rejects_javascript(self):
         from app.booking import calendly_href
 
         self.assertEqual(calendly_href("javascript:alert(1)", "Alex", "a@b.com"), "")
-        self.assertEqual(calendly_href("http://calendly.com/x", "Alex", "a@b.com"), "")
+
+    def test_upgrades_http_and_fills_blank_env(self):
+        from unittest.mock import patch
+
+        from app.booking import DEFAULT_CALENDLY, calendly_href, configured_booking_url
+
+        href = calendly_href("http://calendly.com/lucianamitchell19/northline-business-automation", "Alex", "a@b.com")
+        self.assertTrue(href.startswith("https://calendly.com/"))
+        with patch("app.booking.settings") as settings:
+            settings.booking_url = ""
+            self.assertEqual(configured_booking_url(), DEFAULT_CALENDLY)
 
 
 if __name__ == "__main__":
