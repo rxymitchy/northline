@@ -7,6 +7,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.booking import configured_booking_url
 from app.config import settings
 from app.emailer import smtp_ready, valid_email
 from app.db import get_db
@@ -122,14 +123,20 @@ def request_help(run_id: int, db: Session = Depends(get_db)):
         raise HTTPException(400, "No lead was saved for this diagnosis.")
     inquiry.wants_help = True
     db.commit()
-    booking = (settings.booking_url or "").strip()
+    booking = configured_booking_url()
     contact = (settings.contact_email or "").strip()
+    if booking:
+        message = "Pick a time on Calendly. Your name and email are filled in when possible."
+    elif contact:
+        message = "Use the email link if Calendly is not configured."
+    else:
+        message = "We noted that you want help. We already have the email you entered."
     return {
         "ok": True,
         "saved": True,
         "booking_url": booking,
         "contact_email": contact,
-        "message": "We noted that you want help. We already have the email you entered.",
+        "message": message,
     }
 
 
@@ -294,7 +301,7 @@ def get_run(run_id: int, db: Session = Depends(get_db), x_admin_pin: str | None 
             "progress": parsed.get("stage") if isinstance(parsed, dict) else None,
             "result": result,
             "smtp_configured": smtp_ready(),
-            "booking_url": (settings.booking_url or "").strip(),
+            "booking_url": configured_booking_url(),
             "contact_email": (settings.contact_email or "").strip(),
         }
     return {

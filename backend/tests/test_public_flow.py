@@ -172,5 +172,22 @@ class VisitorResearchTests(unittest.TestCase):
         self.assertIn("Public web mentions", dx["summary"])
 
 
+class BookingTests(unittest.TestCase):
+    def test_prefills_calendly_name_and_email(self):
+        from app.booking import calendly_href, is_calendly
+
+        href = calendly_href("https://calendly.com/northline/20min", "Alex", "alex@example.com")
+        self.assertIn("calendly.com/northline/20min", href)
+        self.assertIn("name=Alex", href)
+        self.assertIn("email=alex%40example.com", href)
+        self.assertTrue(is_calendly(href))
+
+    def test_rejects_non_https(self):
+        from app.booking import calendly_href
+
+        self.assertEqual(calendly_href("javascript:alert(1)", "Alex", "a@b.com"), "")
+        self.assertEqual(calendly_href("http://calendly.com/x", "Alex", "a@b.com"), "")
+
+
 if __name__ == "__main__":
     unittest.main()

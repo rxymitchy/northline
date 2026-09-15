@@ -249,7 +249,7 @@ function renderResult(res){
     </div>
     <div class="card" id="helpCard">
       <h2>Want Northline to help with this?</h2>
-      <p>You already left your email. If you want help implementing the workflow above, book a short call. This is one next step, not a second product.</p>
+      <p>Book a 20-minute call on Calendly. Your name and email from this form are filled in so you can pick a time instead of waiting for a follow-up.</p>
       <p id="helpStatus" class="caveat" style="margin-top:10px"></p>
     </div>`;
   const downloadBtn = document.getElementById("downloadBtn");
@@ -260,8 +260,11 @@ function renderResult(res){
   const help = document.getElementById("helpBtn");
   help.classList.remove("hidden");
   help.textContent = "Schedule a 20-minute call";
-  if (bookingUrl) {
-    help.href = bookingUrl;
+  help.target = "_blank";
+  help.rel = "noopener";
+  const calendly = withCalendlyPrefill(bookingUrl);
+  if (calendly) {
+    help.href = calendly;
     help.onclick = () => { askForHelp(false); };
   } else if (contactEmail) {
     help.href = "mailto:" + contactEmail + "?subject=" + encodeURIComponent("Help implementing the Northline workflow");
@@ -285,8 +288,23 @@ async function askForHelp(showSaved){
     const status = document.getElementById("helpStatus");
     if (status) status.textContent = data.message || "We noted that you want help.";
     if (showSaved) setNote("We’ll follow up on the email you already gave us.", "good");
+    else if (bookingUrl) setNote("Calendly should open in a new tab so you can pick a time.", "good");
   } catch (ex) {
     setNote("Could not save that request. Download the report and email us separately.", "bad");
+  }
+}
+function withCalendlyPrefill(base){
+  if (!base) return "";
+  try {
+    const u = new URL(base);
+    if (u.protocol !== "https:") return "";
+    const name = document.getElementById("name").value.trim();
+    const email = document.getElementById("email").value.trim();
+    if (name) u.searchParams.set("name", name);
+    if (email) u.searchParams.set("email", email);
+    return u.toString();
+  } catch (ex) {
+    return "";
   }
 }
 function downloadReport(){
