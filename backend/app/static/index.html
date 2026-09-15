@@ -22,7 +22,12 @@
     .page { max-width: 680px; margin: 0 auto; padding: 8vh 20px 88px; }
     h1 { font-size: clamp(26px, 4vw, 34px); font-weight: 650; letter-spacing: -.03em; line-height: 1.2; margin: 0 0 10px; text-align: center; }
     .brand { text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--blue); margin: 0 0 14px; }
-    .slogan { text-align: center; color: var(--mute); margin: 0 0 28px; font-size: 15px; }
+    .slogan { text-align: center; color: var(--mute); margin: 0 0 18px; font-size: 15px; }
+    .how { margin: 0 auto 22px; padding: 0; list-style: none; max-width: 420px; color: var(--mute); font-size: 14px; }
+    .how li { display: flex; gap: 10px; margin: 8px 0; text-align: left; line-height: 1.4; }
+    .how b { color: var(--ink); font-weight: 650; min-width: 1.2em; }
+    .choose-label { font-size: 13px; font-weight: 700; margin: 0 0 8px; color: var(--ink); }
+    .path-hint { font-size: 13px; color: var(--mute); margin: 0 0 16px; }
     .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
     .choice {
       border: 1px solid var(--line);
@@ -94,14 +99,21 @@
   <div class="page">
     <form id="form">
       <p class="brand">Northline</p>
-      <h1>Manual work is quietly ruining the company</h1>
-      <p class="slogan">Show how work comes in. Northline will say what still depends on a person — and what to automate first.</p>
+      <h1>See what's still manual</h1>
+      <p class="slogan">Tell us how work comes in. We'll show what to automate first.</p>
+      <ol class="how">
+        <li><b>1</b><span>Pick one option below.</span></li>
+        <li><b>2</b><span>Add the link, file, or a short note.</span></li>
+        <li><b>3</b><span>Enter your name and email, then tap <b>See the diagnosis</b>.</span></li>
+      </ol>
+      <p class="choose-label">Choose one</p>
       <div class="choices">
         <button type="button" class="choice on" data-source="website">Website</button>
         <button type="button" class="choice" data-source="social">Social media</button>
         <button type="button" class="choice" data-source="csv">Data file / CSV</button>
         <button type="button" class="choice" data-source="describe">Describe how you work</button>
       </div>
+      <p class="path-hint" id="pathHint">Paste the company website.</p>
       <div id="urlWrap">
         <label id="urlLabel" for="url">Website</label>
         <input id="url" type="url" placeholder="https://" />
@@ -112,7 +124,7 @@
       </div>
       <div id="descWrap" class="hidden">
         <label for="description">How work moves today</label>
-        <textarea id="description" placeholder="Who takes the lead, where it lives (WhatsApp, Excel, inbox), what you do by hand…"></textarea>
+        <textarea id="description" placeholder="Who takes the lead, where it sits, what you still do by hand…"></textarea>
       </div>
       <label for="name">Your name</label>
       <input id="name" type="text" autocomplete="name" required />
@@ -129,7 +141,7 @@
       <div class="actions">
         <button class="btn primary hidden" id="downloadBtn" type="button">Download the full report</button>
         <button class="btn ghost hidden" id="betterBtn" type="button">See companies in this industry</button>
-        <a class="btn ghost hidden" id="helpBtn" href="#" target="_blank" rel="noopener">Schedule a 20-minute call</a>
+        <a class="btn ghost hidden" id="helpBtn" href="/book" target="_blank" rel="noopener noreferrer">Schedule a 30-minute call</a>
       </div>
       <div id="peers" class="card hidden" style="margin-top:16px"></div>
       <p class="note" id="note"></p>
@@ -150,6 +162,13 @@ document.querySelectorAll(".choice").forEach(btn => {
     document.getElementById("fileWrap").classList.toggle("hidden", source!=="csv");
     document.getElementById("descWrap").classList.toggle("hidden", source!=="describe" && source!=="csv");
     document.getElementById("urlLabel").textContent = source==="social" ? "Social profile link" : "Website";
+    const hints = {
+      website: "Paste the company website.",
+      social: "Paste a public profile link.",
+      csv: "Upload the file, then add a short note about follow-up.",
+      describe: "Write how leads come in and what you do by hand.",
+    };
+    document.getElementById("pathHint").textContent = hints[source] || hints.website;
   };
 });
 document.getElementById("form").onsubmit = async (e) => {
@@ -249,7 +268,7 @@ function renderResult(res){
     </div>
     <div class="card" id="helpCard">
       <h2>Want Northline to help with this?</h2>
-      <p>You already left your email. If you want help implementing the workflow above, book a short call. This is one next step, not a second product.</p>
+      <p>Book a 30-minute call on Calendly. Your name and email from this form are filled in so you can pick a time instead of waiting for a follow-up.</p>
       <p id="helpStatus" class="caveat" style="margin-top:10px"></p>
     </div>`;
   const downloadBtn = document.getElementById("downloadBtn");
@@ -259,18 +278,11 @@ function renderResult(res){
   document.getElementById("betterBtn").onclick = findBetter;
   const help = document.getElementById("helpBtn");
   help.classList.remove("hidden");
-  help.textContent = "Schedule a 20-minute call";
-  if (bookingUrl) {
-    help.href = bookingUrl;
-    help.onclick = () => { askForHelp(false); };
-  } else if (contactEmail) {
-    help.href = "mailto:" + contactEmail + "?subject=" + encodeURIComponent("Help implementing the Northline workflow");
-    help.onclick = () => { askForHelp(false); };
-  } else {
-    help.removeAttribute("target");
-    help.href = "#helpCard";
-    help.onclick = (ev) => { ev.preventDefault(); askForHelp(true); };
-  }
+  help.textContent = "Schedule a 30-minute call";
+  help.target = "_blank";
+  help.rel = "noopener noreferrer";
+  help.href = scheduleHref();
+  help.onclick = () => { askForHelp(false); };
   setNote("We saved your name and email when you started. Download the snapshot, or see companies in this industry.", "");
 }
 function setNote(text, kind){
@@ -283,10 +295,35 @@ async function askForHelp(showSaved){
     const r = await fetch("/api/runs/"+runId+"/help", {method:"POST"});
     const data = await r.json().catch(()=>({}));
     const status = document.getElementById("helpStatus");
-    if (status) status.textContent = data.message || "We noted that you want help.";
-    if (showSaved) setNote("We’ll follow up on the email you already gave us.", "good");
+    if (status) status.textContent = data.message || "Opening Calendly to pick a time.";
+    setNote("Calendly should open in a new tab so you can pick a time.", "good");
   } catch (ex) {
     setNote("Could not save that request. Download the report and email us separately.", "bad");
+  }
+}
+function scheduleHref(){
+  const dest = withCalendlyPrefill(bookingUrl);
+  if (dest) return dest;
+  const u = new URL("/book", window.location.origin);
+  const name = document.getElementById("name").value.trim();
+  const email = document.getElementById("email").value.trim();
+  if (name) u.searchParams.set("name", name);
+  if (email) u.searchParams.set("email", email);
+  return u.pathname + u.search;
+}
+function withCalendlyPrefill(base){
+  if (!base) return "";
+  try {
+    const u = /^https?:\/\//i.test(base) ? new URL(base) : new URL(base, window.location.origin);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return "";
+    if (u.protocol === "http:") u.protocol = "https:";
+    const name = document.getElementById("name").value.trim();
+    const email = document.getElementById("email").value.trim();
+    if (name) u.searchParams.set("name", name);
+    if (email) u.searchParams.set("email", email);
+    return u.toString();
+  } catch (ex) {
+    return "";
   }
 }
 function downloadReport(){

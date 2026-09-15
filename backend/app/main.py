@@ -2,9 +2,10 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 
 from app.api import router
+from app.booking import calendly_href, configured_booking_url
 from app.config import settings
 from app.db import init_db
 from app.emailer import sending_outbound_allowed, smtp_ready
@@ -37,6 +38,12 @@ def health():
         "outbound_will_send": sending_outbound_allowed(),
         "openai_configured": bool(settings.openai_api_key),
     }
+
+
+@app.get("/book")
+def book(name: str = "", email: str = ""):
+    dest = calendly_href(configured_booking_url(), name, email)
+    return RedirectResponse(url=dest, status_code=302)
 
 
 @app.get("/")
