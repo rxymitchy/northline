@@ -10,8 +10,8 @@
       --ink: #171717;
       --mute: #5c5c5c;
       --line: #e4e4e0;
-      --blue: #1d4ed8;
-      --blue-hover: #1e40af;
+      --green: #15803d;
+      --green-hover: #166534;
       --card: #fff;
       --high: #9a3412;
       --med: #854d0e;
@@ -21,7 +21,7 @@
     html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 16px/1.55 ui-sans-serif, system-ui, Segoe UI, sans-serif; }
     .page { max-width: 680px; margin: 0 auto; padding: 8vh 20px 88px; }
     h1 { font-size: clamp(26px, 4vw, 34px); font-weight: 650; letter-spacing: -.03em; line-height: 1.2; margin: 0 0 10px; text-align: center; }
-    .brand { text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--blue); margin: 0 0 14px; }
+    .brand { text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--green); margin: 0 0 14px; }
     .slogan { text-align: center; color: var(--mute); margin: 0 0 18px; font-size: 15px; }
     .how { margin: 0 auto 22px; padding: 0; list-style: none; max-width: 420px; color: var(--mute); font-size: 14px; }
     .how li { display: flex; gap: 10px; margin: 8px 0; text-align: left; line-height: 1.4; }
@@ -39,7 +39,7 @@
       font-size: 14px;
       font-weight: 600;
     }
-    .choice:hover, .choice.on { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(29,78,216,.12); }
+    .choice:hover, .choice.on { border-color: var(--green); box-shadow: 0 0 0 3px rgba(21,128,61,.16); }
     label { display: block; font-size: 13px; color: var(--mute); margin: 12px 0 6px; }
     input, textarea {
       width: 100%;
@@ -50,18 +50,18 @@
       background: #fff;
     }
     textarea { min-height: 120px; resize: vertical; }
-    input:focus, textarea:focus { outline: 2px solid rgba(29,78,216,.3); border-color: var(--blue); }
+    input:focus, textarea:focus { outline: 2px solid rgba(21,128,61,.3); border-color: var(--green); }
     .btn {
       display: inline-flex; align-items: center; justify-content: center;
       min-height: 46px; padding: 0 22px; border-radius: 10px; border: 0;
       font: 600 15px/1 inherit; cursor: pointer;
     }
-    .btn.primary { background: var(--blue); color: #fff; width: 100%; margin-top: 18px; }
-    .btn.primary:hover { background: var(--blue-hover); }
+    .btn.primary { background: var(--green); color: #fff; width: 100%; margin-top: 18px; }
+    .btn.primary:hover { background: var(--green-hover); }
     .btn.primary:disabled, .btn.ghost:disabled { opacity: .5; cursor: default; }
-    .btn.ghost { background: #fff; color: var(--blue); border: 1px solid var(--blue); width: 100%; margin-top: 10px; text-decoration: none; }
-    .btn.green { background: #15803d; color: #fff; width: 100%; margin-top: 10px; gap: 8px; }
-    .btn.green:hover { background: #166534; }
+    .btn.ghost { background: #fff; color: var(--green); border: 1px solid var(--green); width: 100%; margin-top: 10px; text-decoration: none; }
+    .btn.green { background: var(--green); color: #fff; width: 100%; margin-top: 10px; gap: 8px; }
+    .btn.green:hover { background: var(--green-hover); }
     .stars { color: #facc15; letter-spacing: 1px; font-size: 15px; line-height: 1; }
     .err { color: #b91c1c; font-size: 14px; text-align: center; min-height: 20px; margin-top: 10px; }
     .ok { color: #166534; }
@@ -84,7 +84,7 @@
     .flow { font-size: 14px; letter-spacing: .01em; }
     .peer { display: block; padding: 12px 0; border-top: 1px solid var(--line); text-decoration: none; color: inherit; }
     .peer:first-of-type { border-top: 0; }
-    .peer b { color: var(--blue); }
+    .peer b { color: var(--green); }
     .peer span { display: block; color: var(--mute); font-size: 13px; margin-top: 4px; }
     .lock {
       position: fixed; left: 14px; bottom: 14px; width: 36px; height: 36px;
@@ -97,7 +97,7 @@
     .caveat { color: var(--mute); font-size: 13px; margin-top: 10px; }
     .actions { margin-top: 8px; }
     .back {
-      background: none; border: 0; color: var(--blue); cursor: pointer;
+      background: none; border: 0; color: var(--green); cursor: pointer;
       font: 600 14px/1 inherit; padding: 0; margin: 0 0 14px;
     }
     .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; }
@@ -108,7 +108,7 @@
       padding: 8px 14px; font: 600 13px/1 inherit; cursor: pointer;
       display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1;
     }
-    .tip-amts button:hover, .tip-amts button.on { border-color: var(--blue); color: var(--blue); }
+    .tip-amts button:hover, .tip-amts button.on { border-color: var(--green); color: var(--green); }
     .tip-usd { color: #15803d; font-size: 12px; font-weight: 700; min-height: 14px; }
     .qr { display: flex; justify-content: center; margin: 12px 0; }
     .qr img { width: 240px; height: 240px; background: #fff; padding: 10px; border-radius: 12px; border: 1px solid var(--line); image-rendering: pixelated; }
