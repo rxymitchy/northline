@@ -506,14 +506,40 @@ async function loadTip(sats){
     setNote("Could not start the tip. Try again in a moment.", "bad");
   }
 }
-function downloadReport(){
-  setNote("Your PDF should start downloading. If it does not, check pop-up or download settings.", "");
-  const a = document.createElement("a");
-  a.href = "/api/runs/"+runId+"/report";
-  a.download = "northline-report.pdf";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+async function downloadReport(){
+  if (!runId) {
+    setNote("Run See the diagnosis again, then download the PDF.", "bad");
+    return;
+  }
+  setNote("Preparing your PDF…", "");
+  try {
+    const r = await fetch("/api/runs/"+runId+"/report");
+    if (r.status === 404) {
+      setNote("This snapshot is no longer on the server. Fill the form and run the diagnosis again, then download.", "bad");
+      return;
+    }
+    const data = await r.blob();
+    if (!r.ok) {
+      let detail = "Could not download the PDF.";
+      try {
+        const err = JSON.parse(await data.text());
+        if (typeof err.detail === "string") detail = err.detail;
+      } catch (ex) {}
+      throw new Error(detail);
+    }
+    if (data.size < 40) throw new Error("Could not download the PDF.");
+    const url = URL.createObjectURL(data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "northline-report.pdf";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setNote("Your PDF should start downloading.", "");
+  } catch (ex) {
+    setNote(ex.message || "Could not download the PDF.", "bad");
+  }
 }
 async function openAdmin(){
   const pin = prompt("Admin pin");

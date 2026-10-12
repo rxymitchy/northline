@@ -254,7 +254,10 @@ def send_report(run_id: int, db: Session = Depends(get_db)):
 def download_report(run_id: int, db: Session = Depends(get_db)):
     run = db.get(ResearchRun, run_id)
     if not run:
-        raise HTTPException(404, "Not found")
+        raise HTTPException(
+            404,
+            "This snapshot is no longer on the server. Run See the diagnosis again, then download.",
+        )
     company = (
         db.query(Company)
         .filter(Company.run_id == run_id)
