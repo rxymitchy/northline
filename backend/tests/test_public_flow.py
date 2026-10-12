@@ -263,7 +263,7 @@ class TipTests(unittest.TestCase):
         }
         fake = "lnbc10u1p" + ("q" * 40)
         inv = {"pr": fake.upper()}
-        with patch("app.tip._get_json", side_effect=[pay, inv]):
+        with patch("app.tip._get_json", side_effect=[pay, inv]), patch("app.tip.bitcoin_usd", return_value=0):
             out = create_tip_invoice(1000)
         blob = str(out).lower()
         self.assertTrue(out["invoice"].startswith("lnbc"))
@@ -271,6 +271,14 @@ class TipTests(unittest.TestCase):
         self.assertTrue(out["qr_png"].startswith("data:image/png;base64,"))
         self.assertNotIn("@blink", blob)
         self.assertNotIn("satoshirxymitchy", blob)
+
+    def test_usd_label_from_btc_price(self):
+        from app.tip import usd_label
+
+        self.assertEqual(usd_label(1000, 100_000), "$1.00")
+        self.assertEqual(usd_label(5000, 80_000), "$4.00")
+        self.assertEqual(usd_label(10000, 80_000), "$8.00")
+        self.assertEqual(usd_label(1000, 0), "")
 
     def test_rejects_junk_invoices(self):
         from app.tip import _clean_invoice
