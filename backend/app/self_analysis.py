@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 from app.brief import BRAND, build_brief
+from app.report_pdf import build_brief_pdf
 from app.db import SessionLocal
 from app.emailer import send_email, valid_email
 from app.logging_util import log_event
@@ -243,13 +244,14 @@ def email_report(run_id: int) -> dict:
         body = intro + (brief.get("text") or company.observed_problem or "Your report is ready.")
         html = brief.get("html")
         safe_name = "".join(c if c.isalnum() else "-" for c in (company.name or "northline"))[:40]
+        pdf = build_brief_pdf(brief, company.name or "Report", company.website or "")
         mail = send_email(
             email,
             subject,
             body,
             html=html,
-            attachment_html=html,
-            attachment_name=f"{safe_name}-northline-report.html",
+            attachment_bytes=pdf,
+            attachment_name=f"{safe_name}-northline-report.pdf",
         )
         outreach = db.query(Outreach).filter(Outreach.company_id == company.id).order_by(Outreach.id.desc()).first()
         if mail.get("sent"):

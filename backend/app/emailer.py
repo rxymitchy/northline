@@ -69,7 +69,8 @@ def send_email(
     body: str,
     html: str | None = None,
     attachment_html: str | None = None,
-    attachment_name: str = "northline-report.html",
+    attachment_bytes: bytes | None = None,
+    attachment_name: str = "northline-report.pdf",
 ) -> dict:
     if not valid_email(to_email):
         return {"sent": False, "reason": "That email address does not look valid.", "code": "invalid_email"}
@@ -87,8 +88,15 @@ def send_email(
     msg.set_content(body or "Your Northline report is attached.")
     if html:
         msg.add_alternative(html, subtype="html")
-    attached = attachment_html if attachment_html is not None else html
-    if attached:
+    if attachment_bytes:
+        msg.add_attachment(
+            attachment_bytes,
+            maintype="application",
+            subtype="pdf",
+            filename=attachment_name,
+        )
+    elif attachment_html is not None or html:
+        attached = attachment_html if attachment_html is not None else html
         msg.add_attachment(
             attached.encode("utf-8"),
             maintype="text",

@@ -507,10 +507,10 @@ async function loadTip(sats){
   }
 }
 function downloadReport(){
-  setNote("Your browser should start the download. If it does not, check pop-up or download settings.", "");
+  setNote("Your PDF should start downloading. If it does not, check pop-up or download settings.", "");
   const a = document.createElement("a");
   a.href = "/api/runs/"+runId+"/report";
-  a.download = "";
+  a.download = "northline-report.pdf";
   document.body.appendChild(a);
   a.click();
   a.remove();
