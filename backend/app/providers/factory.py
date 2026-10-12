@@ -19,3 +19,14 @@ def get_search_provider(name: str | None = None) -> SearchProvider:
     if key not in PROVIDERS:
         raise ValueError(f"Unknown SEARCH_PROVIDER '{key}'. Use: {', '.join(PROVIDERS)}")
     return PROVIDERS[key]()
+
+
+def get_web_search_provider() -> SearchProvider:
+    """Prefer a keyed engine when present — stronger for social/website mentions."""
+    if settings.serper_api_key:
+        return SerperProvider()
+    if settings.brave_api_key:
+        return BraveProvider()
+    if settings.tavily_api_key:
+        return TavilyProvider()
+    return get_search_provider()

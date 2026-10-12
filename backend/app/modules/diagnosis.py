@@ -90,15 +90,25 @@ def _processes(source: str, signals: dict, text: str, gap: dict) -> list[dict]:
                 "why": "The sheet becomes the system of record only if a person remembers to keep it current.",
             }
         )
-    if source == "social" and not any(r["process"] == "Lead capture" for r in rows):
-        rows.append(
-            {
-                "process": "Lead capture",
-                "human_work": "Interest looks like it still depends on someone reading DMs or comments.",
-                "priority": "HIGH",
-                "why": "Social traffic that is not captured elsewhere disappears when the algorithm moves on.",
-            }
-        )
+    if source == "social" or signals.get("dm_cta") or signals.get("comments_cta"):
+        if not any(r["process"] == "Lead capture" for r in rows):
+            rows.append(
+                {
+                    "process": "Lead capture",
+                    "human_work": "Interest looks like it still depends on someone reading DMs, comments, or inbox requests.",
+                    "priority": "HIGH",
+                    "why": "Social traffic that is not captured on a page you own disappears when the feed moves on.",
+                }
+            )
+        elif signals.get("dm_cta") and not signals.get("whatsapp_channel") and not signals.get("enquiry_form"):
+            rows.append(
+                {
+                    "process": "Inbox triage",
+                    "human_work": "Public copy asks people to DM, with no visible form or WhatsApp capture beside the profile.",
+                    "priority": "HIGH",
+                    "why": "DM volume does not queue itself — each reply waits on whoever has the phone.",
+                }
+            )
     # Deduplicate by process name, keep first (usually stronger).
     seen = set()
     out = []
@@ -129,8 +139,13 @@ def _overall(processes: list[dict], gap: dict) -> str:
 
 def _summary(source: str, overall: str, primary: dict | None, channel: dict | None, research: dict | None = None) -> str:
     channel_state = (channel or {}).get("state") or ""
-    mentions = bool((research or {}).get("public_mentions"))
-    extra = " Public web mentions were checked alongside the link or description you sent." if mentions else ""
+    mentions = (research or {}).get("public_mentions") or []
+    pages = (research or {}).get("pages") or []
+    extra = ""
+    if mentions:
+        extra = f" Public web mentions were checked ({len(mentions)} sources) alongside the link or description you sent."
+    if pages:
+        extra += f" {len(pages)} public page{'s' if len(pages) != 1 else ''} could be read."
     if overall == "LOW":
         return (
             "Northline found limited public evidence of a repeated manual handoff. "

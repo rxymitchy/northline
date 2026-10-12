@@ -50,6 +50,14 @@ def detect_automation_gap(research: dict, track: str | None) -> dict:
     if signals.get("enquiry_form") and not signals.get("crm_mention") and not signals.get("chatbot"):
         facts.append("Enquiry/contact form present; no CRM or chatbot mentioned.")
         gaps.append("Inbound enquiries likely land in email/WhatsApp with manual qualification.")
+    if signals.get("dm_cta") or signals.get("comments_cta"):
+        facts.append("Public copy asks people to DM or comment rather than use a form they own.")
+        gaps.append("Social inbox capture still looks staff-dependent.")
+    if signals.get("link_in_bio"):
+        facts.append("A link-in-bio or similar hub is mentioned.")
+    mentions = research.get("public_mentions") or []
+    if mentions:
+        facts.append(f"Found {len(mentions)} public web mentions besides the submitted link.")
     if signals.get("online_booking") and signals.get("chatbot"):
         facts.append("Online booking and a chatbot are both visible — less of an ops gap.")
 

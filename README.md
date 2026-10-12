@@ -7,7 +7,7 @@ Repo: [github.com/rxymitchy/northline](https://github.com/rxymitchy/northline)
 
 Northline looks at how a business takes work in — website, social profile, spreadsheet, or a short description — and says what still depends on a person. It is not a generic lead scraper.
 
-Paste how you work, get a snapshot, download the full report, optionally **schedule a 30-minute call** on Calendly, then optionally see **real companies** in the same industry (not blogs or roundups). Those companies are included when you download the report again.
+Paste how you work, get a snapshot, download the full report. If it helped, you can send a **Lightning tip** (scan a QR — the wallet destination is not shown on the page).
 
 A PIN-locked **admin** hunt still finds other businesses with public automation gaps and drafts outreach to **public** emails only. Never invented contacts.
 
@@ -25,8 +25,7 @@ The first visit after idle can take about a minute (the free instance sleeps). T
 2. Add name and email, then **See the diagnosis**.
 3. Northline reads what you sent **and** a short public web search for the company, in parallel, usually in **10–20 seconds**.
 4. Snapshot: overall manual dependency, which processes still wait on a person, what to automate first, suggested workflow.
-5. **Download the full report**. **Schedule a 30-minute call** opens [Calendly](https://calendly.com/lucianamitchell19/northline-business-automation) with name and email filled in.
-6. **See companies in this industry** — operating businesses, not listicles. Download the report again so they are in the file.
+5. **Download the full report**. **Tip us in bitcoin** makes a one-time Lightning invoice you can scan.
 
 Visitor diagnosis stays heuristic: no OpenAI, no invented emails, no login/CAPTCHA bypass.
 
@@ -55,7 +54,7 @@ Hosted on Render from the `master` branch (`render.yaml`). **Do not deploy this 
 
 To redeploy: push to `master`, or use **Manual Deploy** on [the Render service](https://dashboard.render.com). The public URL is **https://northline-8j55.onrender.com**.
 
-Set `ADMIN_PIN` and `BOOKING_URL` in the Render dashboard if you change them. Visitor diagnosis does not need OpenAI.
+Set `ADMIN_PIN` in the Render dashboard if you change it. Visitor diagnosis does not need OpenAI. Lightning tips use a server-side Lightning Address (default Blink) and never print that address in the UI.
 
 ## Environment
 
@@ -65,8 +64,8 @@ Set `ADMIN_PIN` and `BOOKING_URL` in the Render dashboard if you change them. Vi
 | `SMTP_PORT` / `SMTP_USE_TLS` | No | Default `587` + TLS |
 | `EMAIL_SENDING_ENABLED` / `OUTBOUND_SEND_ENABLED` | Keep `false` until SMTP works | Cold emails to public contacts |
 | `ADMIN_PIN` | For `/admin` | Unlock the hunt dashboard |
-| `BOOKING_URL` | For the call CTA | Calendly event, default Northline 30-minute call |
-| `CONTACT_EMAIL` | No | Fallback only if Calendly is not set |
+| `LIGHTNING_ADDRESS` | No | Server-only receive address for tips. Leave blank to use the built-in Blink address |
+| `CONTACT_EMAIL` | No | Unused on the public page |
 | `OPENAI_API_KEY` | For AI drafts | Admin ICP/outreach; visitor search does not need it |
 | `SEARCH_PROVIDER` | No | `duckduckgo` (free), `tavily`, `serper`, or `brave` |
 | `TAVILY_API_KEY` / `SERPER_API_KEY` / `BRAVE_API_KEY` | If you switch provider | Search APIs |
@@ -80,7 +79,7 @@ Python modules: `backend/app/modules/`. Search providers: `backend/app/providers
 ## Known limitations
 
 - Public HTML only. No login, CAPTCHA, paywall, or ToS bypass.
-- Similar companies are filtered to operating sites; thin or blocked pages may be skipped.
+- Social apps often wall the real profile; diagnosis uses public HTML plus web mentions, not a login bypass.
 - Decision-maker emails are often missing on the admin hunt; marked **CONTACT NOT VERIFIED**. Never fabricated.
 - If SMTP is empty, reports still show on the page and can be downloaded.
 - Free Render sleeps when idle; first request after that is slow. Disk is ephemeral.

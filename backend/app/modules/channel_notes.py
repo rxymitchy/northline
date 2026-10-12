@@ -38,7 +38,7 @@ def _social(network: str | None, text: str, signals: dict, gaps: list) -> dict:
     if "login" in text or "log in" in text:
         state += " A lot of the real conversation is behind the login, so public pages only show part of the work."
     missing = [
-        "A capture step in the bio (form, WhatsApp, or booking) so interest does not die in DMs.",
+        "A capture step in the bio (form or WhatsApp) so interest does not die in DMs.",
         "A page you own (even one landing page) so the algorithm is not the only storefront.",
     ]
     others = {
@@ -73,7 +73,7 @@ def _website(text: str, signals: dict, gaps: list) -> dict:
     explore = []
     if not signals.get("online_booking") and not signals.get("ecommerce"):
         missing.append("Self-serve booking, quoting, or checkout so staff are not the only path.")
-        explore.append("Calendly, a simple booking page, or checkout — depending on what you sell.")
+        explore.append("A simple booking page or checkout — depending on what you sell.")
     if not _has_social(text):
         missing.append("Links to where you actually talk to customers (Instagram, Facebook, TikTok, LinkedIn).")
         explore.append("Pick one social app for proof of work, then point it back to this site.")

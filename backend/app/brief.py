@@ -131,8 +131,6 @@ def _html_doc(name, site, industry, observed, facts, gaps, offer, similar, right
   <h2>Suggested workflow</h2>
   {_workflow_html(diagnosis.get("workflow") or [])}
   {_channel_html(channel)}
-  <h2>Relevant operating companies</h2>
-  {_peer_list(right or similar)}
   <p class="foot">{escape(diagnosis.get("caveat") or "Public pages and what you submitted only. We do not invent emails or internal problems.")}</p>
 </body></html>"""
 
@@ -153,15 +151,10 @@ def _channel_html(channel: dict) -> str:
 
 
 def _text_doc(name, site, industry, observed, facts, gaps, offer, similar, right, channel, diagnosis) -> str:
-    def lines(title, items, fmt):
-        body = "\n".join(fmt(i) for i in items) if items else "- None listed."
-        return f"{title}\n{body}\n"
-
     overall = diagnosis.get("overall_label") or diagnosis.get("overall") or "Not rated"
     automate = diagnosis.get("automate_first") or {}
     processes = diagnosis.get("processes") or []
     workflow = diagnosis.get("workflow") or []
-    peers = right or similar
     bits = [
         f"{name}",
         f"{site} {('· ' + industry) if industry else ''}".strip(),
@@ -189,7 +182,6 @@ def _text_doc(name, site, industry, observed, facts, gaps, offer, similar, right
     if channel and channel.get("state"):
         bits += ["NOTES ON WHAT YOU SENT", channel.get("state"), ""]
     bits += [
-        lines("Relevant operating companies", peers, lambda r: f"- {r.get('name')}: {r.get('website')} — {r.get('why') or r.get('snippet') or ''}"),
         diagnosis.get("caveat") or "",
         f"— {BRAND}",
         "",
