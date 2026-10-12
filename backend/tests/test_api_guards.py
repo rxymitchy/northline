@@ -71,6 +71,8 @@ class ApiGuardTests(unittest.TestCase):
         body = r.text.lower()
         self.assertNotIn("password", body)
         self.assertIn("smtp_configured", r.json())
+        self.assertEqual(r.json().get("database"), "sqlite")
+        self.assertNotIn("postgres://", body)
 
     def test_book_route_is_gone(self):
         r = self.client.get("/book", follow_redirects=False)

@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 
 from app.api import router
 from app.config import settings
-from app.db import init_db
+from app.db import engine, init_db
 from app.emailer import sending_outbound_allowed, smtp_ready
 
 Path("data").mkdir(exist_ok=True)
@@ -36,6 +36,7 @@ def health():
         "smtp_configured": smtp_ready(),
         "outbound_will_send": sending_outbound_allowed(),
         "openai_configured": bool(settings.openai_api_key),
+        "database": engine.dialect.name,
     }
 
 

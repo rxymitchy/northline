@@ -17,7 +17,7 @@ Northline is **open source** under the [MIT License](LICENSE). Issues and pull r
 3. Wait about 10–20 seconds.
 4. Download the PDF. Tip if you want to.
 
-It only uses what you send and what is already public. It does not invent emails, skip logins, or need your computer to stay on. The live app is on Render; the first visit after idle can take about a minute.
+It only uses what you send and what is already public. It does not invent emails, skip logins, or need your computer to stay on. The live app is on Render; the first visit after idle can take about a minute. Names and emails from the form are stored in a database that survives restarts.
 
 ## Run locally
 
