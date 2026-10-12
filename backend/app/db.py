@@ -44,9 +44,12 @@ def init_db():
     from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
-    if engine.dialect.name != "sqlite":
-        return
     with engine.begin() as conn:
+        if engine.dialect.name == "postgresql":
+            conn.execute(text("ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS paid_credits INTEGER DEFAULT 0"))
+            return
+        if engine.dialect.name != "sqlite":
+            return
         cols = [row[1] for row in conn.execute(text("PRAGMA table_info(research_runs)"))]
         if "kind" not in cols:
             conn.execute(text("ALTER TABLE research_runs ADD COLUMN kind VARCHAR(40) DEFAULT 'outbound'"))
@@ -57,6 +60,8 @@ def init_db():
             conn.execute(text("ALTER TABLE inquiries ADD COLUMN search_count INTEGER DEFAULT 1"))
         if inquiry_cols and "updated_at" not in inquiry_cols:
             conn.execute(text("ALTER TABLE inquiries ADD COLUMN updated_at DATETIME"))
+        if inquiry_cols and "paid_credits" not in inquiry_cols:
+            conn.execute(text("ALTER TABLE inquiries ADD COLUMN paid_credits INTEGER DEFAULT 0"))
         if inquiry_cols:
             conn.execute(
                 text(

@@ -6,7 +6,7 @@ from threading import Thread
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -19,7 +19,10 @@ from app.pipeline import run_pipeline
 from app.playbook import DEFAULT_ICP
 from app.report_pdf import build_brief_pdf
 from app.self_analysis import compose_brief, email_report, run_search
-from app.tip import create_tip_invoice, tip_menu, tip_rate_ok
+from app.tip import create_tip_invoice, tip_menu, tip_rate_ok, usd_label
+
+FREE_DIAGNOSES = 5
+EXTRA_DIAGNOSIS_SATS = 1000
 
 
 router = APIRouter()
@@ -49,6 +52,14 @@ def _admin_ok(pin: str | None) -> bool:
     return hmac.compare_digest(got, expected)
 
 
+def _admin_email_ok(email: str | None) -> bool:
+    expected = (settings.admin_email or "").strip().lower().encode("utf-8")
+    got = (email or "").strip().lower().encode("utf-8")
+    if not expected or len(expected) != len(got):
+        return False
+    return hmac.compare_digest(got, expected)
+
+
 class RunRequest(BaseModel):
     icp: str
     target_count: int | None = None
@@ -56,6 +67,11 @@ class RunRequest(BaseModel):
 
 class PinRequest(BaseModel):
     pin: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 
 class FeedbackRequest(BaseModel):
@@ -78,6 +94,15 @@ def admin_unlock(payload: PinRequest):
     return {"ok": True}
 
 
+@router.post("/admin/login")
+def admin_login(payload: LoginRequest):
+    email_ok = _admin_email_ok(payload.email)
+    pass_ok = _admin_ok(payload.password)
+    if not (email_ok and pass_ok):
+        raise HTTPException(403, "Wrong email or password")
+    return {"ok": True, "email": (settings.admin_email or "").strip().lower()}
+
+
 @router.post("/search")
 async def create_search(
     db: Session = Depends(get_db),
@@ -87,6 +112,7 @@ async def create_search(
     url: str = Form(""),
     description: str = Form(""),
     file: UploadFile | None = File(None),
+    unlock: str = Form(""),
 ):
     name = (name or "").strip()
     email = (email or "").strip().lower()
@@ -129,6 +155,26 @@ async def create_search(
         live = db.get(ResearchRun, inquiry.run_id)
         if live and live.kind == "search" and live.status in ("queued", "running"):
             return {"id": live.id, "status": live.status, "lead_saved": True, "reused": True}
+    used = int(inquiry.search_count or 0) if inquiry else 0
+    if used >= FREE_DIAGNOSES and (unlock or "").strip() != "1":
+        try:
+            invoice = create_tip_invoice(EXTRA_DIAGNOSIS_SATS)
+        except Exception:
+            raise HTTPException(502, "Could not start the Lightning payment. Try again in a moment.") from None
+        usd = invoice.get("amount_usd") or usd_label(EXTRA_DIAGNOSIS_SATS)
+        return JSONResponse(
+            status_code=402,
+            content={
+                "need_payment": True,
+                "search_count": used,
+                "next_number": used + 1,
+                "amount_sats": EXTRA_DIAGNOSIS_SATS,
+                "amount_usd": usd,
+                "qr_png": invoice.get("qr_png") or "",
+                "invoice": invoice.get("invoice") or "",
+                "message": "Your first 5 snapshots are included. From the 6th, each one is 1,000 sats.",
+            },
+        )
     run = ResearchRun(icp_text=json.dumps(payload), status="queued", kind="search")
     db.add(run)
     db.commit()
@@ -141,6 +187,8 @@ async def create_search(
         inquiry.source_kind = source
         inquiry.source_value = detail
         inquiry.search_count = int(inquiry.search_count or 1) + 1
+        if (unlock or "").strip() == "1":
+            inquiry.paid_credits = int(inquiry.paid_credits or 0) + 1
         inquiry.updated_at = now
     else:
         db.add(
@@ -217,7 +265,9 @@ def list_leads(db: Session = Depends(get_db), x_admin_pin: str | None = Header(d
             "detail": (row.source_value or "")[:240],
             "wants_help": bool(getattr(row, "wants_help", False)),
             "search_count": int(getattr(row, "search_count", 1) or 1),
+            "paid_credits": int(getattr(row, "paid_credits", 0) or 0),
             "created_at": row.created_at.isoformat() if row.created_at else None,
+            "updated_at": row.updated_at.isoformat() if getattr(row, "updated_at", None) else None,
         }
         for row in rows
     ]
