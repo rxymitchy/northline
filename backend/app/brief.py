@@ -110,7 +110,7 @@ def _html_doc(name, site, industry, observed, facts, gaps, offer, similar, right
   li {{ margin: 6px 0; }}
   .peers span {{ display: block; color: #5f6368; font-size: 13px; font-family: Arial, sans-serif; }}
   .empty {{ color: #5f6368; }}
-  a {{ color: #1a73e8; }}
+  a {{ color: #15803d; }}
   .foot {{ margin-top: 36px; color: #80868b; font-size: 12px; font-family: Arial, sans-serif; }}
   table.ops {{ width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 13px; }}
   table.ops th, table.ops td {{ border-bottom: 1px solid #e5e7eb; text-align: left; padding: 8px 6px; vertical-align: top; }}
