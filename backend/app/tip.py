@@ -86,7 +86,7 @@ def create_tip_invoice(amount_sats: int) -> dict:
         "invoice": invoice,
         "wallet_uri": uri,
         "qr_png": png,
-        "expires_hint": "Scan the code with a Lightning wallet, or open / copy the invoice. It is one-time.",
+        "expires_hint": "Scan with Phoenix, Blink, Wallet of Satoshi, Zeus, or any Lightning wallet. The invoice is one-time.",
     }
 
 
