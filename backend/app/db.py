@@ -8,10 +8,25 @@ class Base(DeclarativeBase):
     pass
 
 
-engine = create_engine(
-    settings.database_url,
-    connect_args={"check_same_thread": False},
-)
+def database_url() -> str:
+    url = (settings.database_url or "").strip() or "sqlite:///./data/prospects.db"
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://") :]
+    return url
+
+
+def _is_sqlite(url: str) -> bool:
+    return url.startswith("sqlite:")
+
+
+_URL = database_url()
+_ENGINE_KW: dict = {"pool_pre_ping": True}
+if _is_sqlite(_URL):
+    _ENGINE_KW["connect_args"] = {"check_same_thread": False}
+else:
+    _ENGINE_KW["pool_recycle"] = 300
+
+engine = create_engine(_URL, **_ENGINE_KW)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -27,6 +42,8 @@ def init_db():
     from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    if engine.dialect.name != "sqlite":
+        return
     with engine.begin() as conn:
         cols = [row[1] for row in conn.execute(text("PRAGMA table_info(research_runs)"))]
         if "kind" not in cols:

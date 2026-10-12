@@ -1,3 +1,9 @@
+databases:
+  - name: northline-db
+    plan: free
+    databaseName: northline
+    user: northline
+
 services:
   - type: web
     name: northline
@@ -16,3 +22,7 @@ services:
         value: "false"
       - key: OUTBOUND_SEND_ENABLED
         value: "false"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: northline-db
+          property: connectionString
