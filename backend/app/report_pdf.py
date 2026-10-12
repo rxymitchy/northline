@@ -2,7 +2,7 @@ from fpdf import FPDF, XPos, YPos
 
 from app.brief import BRAND
 
-BLUE = (29, 78, 216)
+GREEN = (21, 128, 61)
 INK = (23, 23, 23)
 MUTE = (92, 92, 92)
 LINE = (228, 228, 224)
@@ -41,13 +41,13 @@ class ReportPDF(FPDF):
         broke = self.auto_page_break
         margin = self.b_margin
         self.set_auto_page_break(False)
-        with self.local_context(fill_opacity=0.07, text_color=BLUE):
+        with self.local_context(fill_opacity=0.07, text_color=GREEN):
             self.set_font("Helvetica", "B", 48)
             label = BRAND.upper()
             cx, cy = self.w / 2, self.h / 2
             with self.rotation(32, cx, cy):
                 self.text(cx - self.get_string_width(label) / 2, cy, label)
-        self.set_fill_color(*BLUE)
+        self.set_fill_color(*GREEN)
         self.rect(0, 0, self.w, 14, "F")
         self.set_text_color(255, 255, 255)
         self.set_font("Helvetica", "B", 10)
@@ -84,9 +84,9 @@ class ReportPDF(FPDF):
         self.ln(3)
         self.set_x(self.l_margin)
         self.set_font("Helvetica", "B", 10)
-        self.set_text_color(*BLUE)
+        self.set_text_color(*GREEN)
         self.cell(0, 6, _t(title).upper(), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        self.set_draw_color(*BLUE)
+        self.set_draw_color(*GREEN)
         self.set_line_width(0.5)
         y = self.get_y()
         self.line(self.l_margin, y, self.l_margin + 26, y)
