@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     outbound_send_delay_seconds: float = 4.0
 
     admin_pin: str = "northline"
+    admin_email: str = "lucianamitchell19@gmail.com"
     booking_url: str = ""
     contact_email: str = ""
     lightning_address: str = ""

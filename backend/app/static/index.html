@@ -132,6 +132,8 @@
     }
     .modal-done { text-align: center; font-weight: 650; color: #166534; margin: 0 28px 10px; }
     .modal-card h2 { text-align: center; }
+    .pay-usd { text-align: center; color: #15803d; font-size: 22px; font-weight: 700; margin: 8px 0 4px; }
+    .pay-sats { text-align: center; font-weight: 650; margin: 0 0 8px; }
   </style>
 </head>
 <body>
@@ -206,12 +208,28 @@
       <p class="caveat" id="tipStatus"></p>
     </div>
   </div>
-  <button class="lock" type="button" title="Admin" onclick="openAdmin()">🔒</button>
+  <div id="payModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="payTitle">
+    <div class="modal-card">
+      <button type="button" class="modal-close" id="payClose">Close</button>
+      <h2 id="payTitle">Continue with Lightning</h2>
+      <p id="payCopy">Your first 5 snapshots are included. From the 6th, each one is 1,000 sats.</p>
+      <p class="pay-usd" id="payUsd"></p>
+      <p class="pay-sats" id="paySats">1,000 sats</p>
+      <div class="qr" id="payQr"></div>
+      <button class="btn green hidden" id="payCopyBtn" type="button">Copy link</button>
+      <p class="caveat">Wallets accepted: Phoenix, Blink, Wallet of Satoshi, Zeus, and other Lightning wallets.</p>
+      <button class="btn green" id="payContinue" type="button">I've paid — see the diagnosis</button>
+      <p class="caveat" id="payStatus"></p>
+    </div>
+  </div>
+  <button class="lock" type="button" title="Admin" onclick="location.href='/admin'">🔒</button>
 <script>
 let source = "website";
 let runId = null;
 let poll = null;
 let contactEmail = "";
+let searchUnlock = false;
+let payInvoice = "";
 const DRAFT_KEY = "northline-draft";
 const RUN_KEY = "northline-run";
 const RESULT_KEY = "northline-result";
@@ -305,6 +323,8 @@ function clearMine(){
     localStorage.removeItem(RESULT_KEY);
   } catch (ex) {}
   runId = null;
+  searchUnlock = false;
+  payInvoice = "";
   if (poll) clearInterval(poll);
   poll = null;
   document.getElementById("url").value = "";
@@ -384,11 +404,19 @@ document.getElementById("form").onsubmit = async (e) => {
   fd.append("description", document.getElementById("description").value.trim());
   const file = document.getElementById("file").files[0];
   if (file) fd.append("file", file);
+  if (searchUnlock) fd.append("unlock", "1");
   document.getElementById("searchBtn").disabled = true;
   try {
     const r = await fetch("/api/search", {method:"POST", body: fd});
     const data = await r.json().catch(()=>({}));
+    if (r.status === 402 && data.need_payment) {
+      searchUnlock = false;
+      showPaywall(data);
+      document.getElementById("searchBtn").disabled = false;
+      return;
+    }
     if (!r.ok) throw new Error(typeof data.detail==="string" ? data.detail : "Could not start");
+    searchUnlock = false;
     runId = data.id;
     saveDraft();
     saveRun();
@@ -501,12 +529,59 @@ async function fillTipUsd(){
 function closeTipModal(){
   document.getElementById("tipModal").classList.add("hidden");
 }
+function closePayModal(){
+  document.getElementById("payModal").classList.add("hidden");
+}
+function showPaywall(data){
+  document.getElementById("payCopy").textContent = data.message || "Your first 5 snapshots are included. From the 6th, each one is 1,000 sats.";
+  document.getElementById("payUsd").textContent = data.amount_usd || "";
+  document.getElementById("paySats").textContent = (Number(data.amount_sats) || 1000).toLocaleString() + " sats";
+  const qr = document.getElementById("payQr");
+  qr.replaceChildren();
+  const png = String(data.qr_png || "");
+  payInvoice = String(data.invoice || "").trim().toLowerCase();
+  const copyBtn = document.getElementById("payCopyBtn");
+  copyBtn.classList.add("hidden");
+  if (png.startsWith("data:image/png;base64,")) {
+    const img = document.createElement("img");
+    img.alt = "Payment code";
+    img.width = 240;
+    img.height = 240;
+    img.src = png;
+    qr.appendChild(img);
+  }
+  if (payInvoice.startsWith("ln")) {
+    copyBtn.classList.remove("hidden");
+    copyBtn.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(payInvoice);
+        document.getElementById("payStatus").textContent = "Link copied. Paste it in your Lightning wallet.";
+      } catch (ex) {
+        document.getElementById("payStatus").textContent = "Copy was blocked. Scan the code instead.";
+      }
+    };
+  }
+  document.getElementById("payStatus").textContent = "Scan the code, then tap I've paid.";
+  document.getElementById("payModal").classList.remove("hidden");
+}
+document.getElementById("payClose").onclick = closePayModal;
+document.getElementById("payModal").onclick = (e) => {
+  if (e.target.id === "payModal") closePayModal();
+};
+document.getElementById("payContinue").onclick = () => {
+  searchUnlock = true;
+  closePayModal();
+  document.getElementById("form").requestSubmit();
+};
 document.getElementById("tipClose").onclick = closeTipModal;
 document.getElementById("tipModal").onclick = (e) => {
   if (e.target.id === "tipModal") closeTipModal();
 };
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeTipModal();
+  if (e.key === "Escape") {
+    closeTipModal();
+    closePayModal();
+  }
 });
 document.querySelectorAll(".tip-amts button").forEach(btn => {
   btn.onclick = () => loadTip(Number(btn.dataset.sats));
@@ -597,14 +672,6 @@ async function downloadReport(){
   } catch (ex) {
     setNote(ex.message || "Could not download the PDF.", "bad");
   }
-}
-async function openAdmin(){
-  const pin = prompt("Admin pin");
-  if (!pin) return;
-  const r = await fetch("/api/admin/unlock", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({pin})});
-  if (!r.ok) { alert("Wrong pin"); return; }
-  sessionStorage.setItem("adminPin", pin);
-  location.href = "/admin";
 }
 function esc(s){ return String(s??"").replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 loadDraft();
