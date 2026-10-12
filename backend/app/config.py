@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     admin_pin: str = "northline"
     booking_url: str = ""
     contact_email: str = ""
+    lightning_address: str = ""
     openai_input_cost_per_1m: float = 0.15
     openai_output_cost_per_1m: float = 0.60
 

@@ -37,11 +37,14 @@ class ApiGuardTests(unittest.TestCase):
         self.assertNotIn("password", body)
         self.assertIn("smtp_configured", r.json())
 
-    def test_book_redirects_to_calendly(self):
+    def test_book_route_is_gone(self):
         r = self.client.get("/book", follow_redirects=False)
-        self.assertEqual(r.status_code, 302)
-        location = r.headers.get("location") or ""
-        self.assertIn("calendly.com", location)
+        self.assertEqual(r.status_code, 404)
+
+    def test_tip_rejects_tiny_amount(self):
+        r = self.client.post("/api/tip", json={"amount_sats": 1})
+        self.assertEqual(r.status_code, 400)
+        self.assertNotIn("@blink", (r.text or "").lower())
 
     def test_describe_flow_builds_downloadable_report(self):
         r = self.client.post(

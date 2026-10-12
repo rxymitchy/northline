@@ -7,7 +7,6 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.booking import configured_booking_url
 from app.config import settings
 from app.emailer import smtp_ready, valid_email
 from app.db import get_db
@@ -15,7 +14,8 @@ from app.export_csv import export_run_csv
 from app.models import Company, Contact, EventLog, Inquiry, Opportunity, Outreach, ResearchRun
 from app.pipeline import run_pipeline
 from app.playbook import DEFAULT_ICP
-from app.self_analysis import compose_brief, email_report, find_better, run_search
+from app.self_analysis import compose_brief, email_report, run_search
+from app.tip import PRESET_SATS, create_tip_invoice
 
 
 router = APIRouter()
@@ -45,6 +45,10 @@ class FeedbackRequest(BaseModel):
 
 class StatusRequest(BaseModel):
     action: str
+
+
+class TipRequest(BaseModel):
+    amount_sats: int = 1000
 
 
 @router.post("/admin/unlock")
@@ -123,21 +127,26 @@ def request_help(run_id: int, db: Session = Depends(get_db)):
         raise HTTPException(400, "No lead was saved for this diagnosis.")
     inquiry.wants_help = True
     db.commit()
-    booking = configured_booking_url()
-    contact = (settings.contact_email or "").strip()
-    if booking:
-        message = "Pick a time on Calendly. Your name and email are filled in when possible."
-    elif contact:
-        message = "Use the email link if Calendly is not configured."
-    else:
-        message = "We noted that you want help. We already have the email you entered."
     return {
         "ok": True,
         "saved": True,
-        "booking_url": booking,
-        "contact_email": contact,
-        "message": message,
+        "message": "Thanks. Use Tip us if you want to send sats — no booking link.",
     }
+
+
+@router.get("/tip")
+def tip_options():
+    return {"ok": True, "amounts_sats": list(PRESET_SATS)}
+
+
+@router.post("/tip")
+def create_tip(payload: TipRequest):
+    try:
+        return create_tip_invoice(payload.amount_sats)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception:
+        raise HTTPException(502, "Could not create a Lightning invoice. Try another amount in a moment.") from None
 
 
 @router.get("/leads")
@@ -219,15 +228,6 @@ def download_report(run_id: int, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/runs/{run_id}/better")
-def better_companies(run_id: int, db: Session = Depends(get_db)):
-    run = db.get(ResearchRun, run_id)
-    if not run:
-        raise HTTPException(404, "Not found")
-    Thread(target=find_better, args=(run_id,), daemon=True).start()
-    return {"ok": True, "id": run_id}
-
-
 @router.post("/runs")
 def create_run(
     payload: RunRequest,
@@ -284,8 +284,6 @@ def get_run(run_id: int, db: Session = Depends(get_db), x_admin_pin: str | None 
             "gaps": _plain_list((fi.get("heuristic_gap") or {}).get("gaps") if isinstance(fi, dict) else []),
             "offer": c.automation_opportunity,
             "emailed": bool(fi.get("emailed")) if isinstance(fi, dict) else False,
-            "doing_it_right": fi.get("doing_it_right") if isinstance(fi, dict) else [],
-            "peers_status": fi.get("peers_status"),
             "confidence": c.confidence,
             "source": fi.get("source") if isinstance(fi, dict) else None,
             "channel": fi.get("channel") if isinstance(fi, dict) else None,
@@ -301,7 +299,6 @@ def get_run(run_id: int, db: Session = Depends(get_db), x_admin_pin: str | None 
             "progress": parsed.get("stage") if isinstance(parsed, dict) else None,
             "result": result,
             "smtp_configured": smtp_ready(),
-            "booking_url": configured_booking_url(),
             "contact_email": (settings.contact_email or "").strip(),
         }
     return {
