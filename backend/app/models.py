@@ -43,6 +43,7 @@ class Inquiry(Base):
     source_value: Mapped[str] = mapped_column(Text, default="")
     wants_help: Mapped[bool] = mapped_column(Boolean, default=False)
     search_count: Mapped[int] = mapped_column(Integer, default=1)
+    paid_credits: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 

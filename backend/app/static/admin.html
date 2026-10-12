@@ -6,55 +6,173 @@
   <title>Northline admin</title>
   <style>
     body { margin: 0; font: 15px/1.45 ui-sans-serif, system-ui, Segoe UI, sans-serif; background: #0f172a; color: #e2e8f0; }
-    .wrap { max-width: 960px; margin: 0 auto; padding: 28px 20px 80px; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 20px 80px; }
     h1 { font-size: 22px; margin: 0 0 8px; }
+    h2 { font-size: 16px; margin: 22px 0 8px; }
     p { color: #94a3b8; }
+    label { display: block; font-size: 13px; font-weight: 650; margin: 12px 0 6px; }
+    input {
+      width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 10px;
+      border: 1px solid #334155; background: #1e293b; color: #f8fafc; font: inherit;
+    }
     button {
-      background: #2563eb; color: #fff; border: 0; border-radius: 10px;
+      background: #15803d; color: #fff; border: 0; border-radius: 10px;
       padding: 12px 18px; font: 600 14px inherit; cursor: pointer;
     }
     button:disabled { opacity: .5; }
-    table { width: 100%; border-collapse: collapse; margin-top: 22px; font-size: 13px; }
+    button.ghost { background: #334155; }
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }
     th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #1e293b; vertical-align: top; }
     th { color: #94a3b8; font-size: 11px; text-transform: uppercase; }
     a { color: #93c5fd; }
     .err { color: #fca5a5; }
+    .hits { font-weight: 750; color: #86efac; }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+    .login-card { max-width: 420px; margin: 48px auto; background: #1e293b; padding: 28px; border-radius: 16px; }
+    .hidden { display: none !important; }
+    .stat { color: #cbd5e1; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Admin</h1>
-    <p>Visitor leads are captured when someone clicks See the diagnosis. The hunt below is separate.</p>
-    <h2 style="font-size:16px;margin:22px 0 8px">Visitor leads</h2>
-    <table><thead><tr><th>When</th><th>Name</th><th>Email</th><th>Source</th><th>Help</th></tr></thead><tbody id="leads"></tbody></table>
-    <h2 style="font-size:16px;margin:28px 0 8px">Outbound hunt</h2>
-    <p>Find companies with serious automation problems and email public decision-makers we can actually verify.</p>
-    <button id="go" type="button">Search companies with automation problems</button>
-    <p class="err" id="err"></p>
-    <div id="meta"></div>
-    <table><thead><tr><th>Score</th><th>Company</th><th>Gap</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table>
+    <form id="login" class="login-card" action="#" method="post">
+      <h1>Management login</h1>
+      <p>Sign in with the admin email to see every inquiry, how many times that email was used, and paid extras.</p>
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" autocomplete="username" required />
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required />
+      <p class="err" id="loginErr"></p>
+      <button type="submit" id="loginBtn" style="margin-top:16px;width:100%">Sign in</button>
+    </form>
+    <div id="dash" class="hidden">
+      <div class="top">
+        <div>
+          <h1>Visitor database</h1>
+          <p id="who" class="stat"></p>
+        </div>
+        <button class="ghost" type="button" id="out">Sign out</button>
+      </div>
+      <h2>Inquiries</h2>
+      <p>One row per email. Hits is how many diagnoses that person has run.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Source</th>
+            <th>Hits</th>
+            <th>Paid extras</th>
+            <th>Help</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody id="leads"></tbody>
+      </table>
+      <h2>Outbound hunt</h2>
+      <p>Find companies with serious automation problems and email public decision-makers we can actually verify.</p>
+      <button id="go" type="button">Search companies with automation problems</button>
+      <p class="err" id="err"></p>
+      <div id="meta"></div>
+      <table><thead><tr><th>Score</th><th>Company</th><th>Gap</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table>
+    </div>
   </div>
 <script>
-const pin = sessionStorage.getItem("adminPin") || "";
-if (!pin) location.href = "/";
+let pin = sessionStorage.getItem("adminPin") || "";
 let current = null;
 let poll = null;
+
+function headers(){
+  return {"X-Admin-Pin": pin, "Content-Type": "application/json"};
+}
+function showLogin(){
+  document.getElementById("login").classList.remove("hidden");
+  document.getElementById("dash").classList.add("hidden");
+}
+function showDash(email){
+  document.getElementById("login").classList.add("hidden");
+  document.getElementById("dash").classList.remove("hidden");
+  document.getElementById("who").textContent = email ? ("Signed in as " + email) : "Signed in";
+}
 async function loadLeads(){
-  const r = await fetch("/api/leads", {headers: {"X-Admin-Pin": pin}});
+  const r = await fetch("/api/leads", {headers: headers()});
+  if (r.status === 403) {
+    sessionStorage.removeItem("adminPin");
+    pin = "";
+    showLogin();
+    return;
+  }
   if (!r.ok) return;
   const rows = await r.json();
+  const unique = (rows || []).length;
+  const hits = (rows || []).reduce((n, row) => n + Number(row.search_count || 0), 0);
+  document.getElementById("who").textContent =
+    (sessionStorage.getItem("adminEmail") || "Admin") +
+    " · " + unique + " unique emails · " + hits + " total hits";
   document.getElementById("leads").innerHTML = (rows||[]).map(row =>
-    `<tr><td>${esc((row.created_at||"").replace("T"," ").slice(0,16))}</td><td>${esc(row.name)}</td><td>${esc(row.email)}</td><td>${esc(row.source)}</td><td>${row.wants_help ? "wants help" : ""}</td></tr>`
-  ).join("") || "<tr><td colspan='4'>No visitor leads yet.</td></tr>";
+    `<tr>
+      <td>${esc((row.updated_at || row.created_at || "").replace("T"," ").slice(0,16))}</td>
+      <td>${esc(row.name)}</td>
+      <td>${esc(row.email)}</td>
+      <td>${esc(row.source)}</td>
+      <td class="hits">${esc(row.search_count)}</td>
+      <td>${esc(row.paid_credits)}</td>
+      <td>${row.wants_help ? "wants help" : ""}</td>
+      <td>${esc((row.detail || "").slice(0,140))}</td>
+    </tr>`
+  ).join("") || "<tr><td colspan='8'>No visitor leads yet.</td></tr>";
 }
-loadLeads();
+async function boot(){
+  if (!pin) {
+    showLogin();
+    return;
+  }
+  showDash(sessionStorage.getItem("adminEmail") || "");
+  await loadLeads();
+}
+document.getElementById("login").onsubmit = async (e) => {
+  e.preventDefault();
+  const err = document.getElementById("loginErr");
+  const btn = document.getElementById("loginBtn");
+  err.textContent = "";
+  btn.disabled = true;
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  try {
+    const r = await fetch("/api/admin/login", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({email, password})
+    });
+    const data = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Could not sign in");
+    pin = password;
+    sessionStorage.setItem("adminPin", password);
+    sessionStorage.setItem("adminEmail", data.email || email);
+    document.getElementById("password").value = "";
+    showDash(data.email || email);
+    await loadLeads();
+  } catch (ex) {
+    err.textContent = ex.message;
+  } finally {
+    btn.disabled = false;
+  }
+};
+document.getElementById("out").onclick = () => {
+  sessionStorage.removeItem("adminPin");
+  sessionStorage.removeItem("adminEmail");
+  pin = "";
+  showLogin();
+};
+boot();
 document.getElementById("go").onclick = async () => {
   document.getElementById("err").textContent = "";
   document.getElementById("go").disabled = true;
   try {
     const r = await fetch("/api/runs", {
       method: "POST",
-      headers: {"Content-Type":"application/json", "X-Admin-Pin": pin},
+      headers: headers(),
       body: JSON.stringify({icp: ""})
     });
     const d = await r.json().catch(()=>({}));
@@ -69,7 +187,7 @@ document.getElementById("go").onclick = async () => {
 function watch(){
   if (poll) clearInterval(poll);
   const tick = async () => {
-    const r = await fetch("/api/runs/"+current, {headers: {"X-Admin-Pin": pin}});
+    const r = await fetch("/api/runs/"+current, {headers: headers()});
     const d = await r.json();
     document.getElementById("meta").textContent = `Hunt ${d.id} · ${d.status} · ${d.discovered_count} found · ${d.qualified_count} qualified`;
     document.getElementById("rows").innerHTML = (d.companies||[]).map(c =>
