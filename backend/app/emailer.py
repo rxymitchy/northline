@@ -7,10 +7,49 @@ from app.config import settings
 
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 
+# RFC 2606 / test hosts and common throwaway inboxes — not a real person or company.
+_BLOCKED_DOMAINS = {
+    "example.com",
+    "example.net",
+    "example.org",
+    "example.edu",
+    "test.com",
+    "invalid.com",
+    "localhost",
+    "mailinator.com",
+    "guerrillamail.com",
+    "guerrillamailblock.com",
+    "sharklasers.com",
+    "grr.la",
+    "yopmail.com",
+    "tempmail.com",
+    "temp-mail.org",
+    "10minutemail.com",
+    "throwawaymail.com",
+    "trashmail.com",
+    "fakeinbox.com",
+    "discard.email",
+    "mailnesia.com",
+    "getnada.com",
+}
+_BLOCKED_TLDS = {"test", "invalid", "localhost", "example", "local"}
+
 
 def valid_email(value: str | None) -> bool:
+    return email_reject_reason(value) is None
+
+
+def email_reject_reason(value: str | None) -> str | None:
     text = (value or "").strip()
-    return bool(text) and len(text) <= 200 and EMAIL_RE.match(text) is not None
+    if not text or len(text) > 200 or EMAIL_RE.match(text) is None:
+        return "Enter a valid email address."
+    host = text.rsplit("@", 1)[-1].lower().rstrip(".")
+    if host in _BLOCKED_DOMAINS or any(host.endswith("." + d) for d in _BLOCKED_DOMAINS):
+        return "Use a real personal or company email, not a test or disposable address."
+    tld = host.rsplit(".", 1)[-1]
+    if tld in _BLOCKED_TLDS:
+        return "Use a real personal or company email, not a test or disposable address."
+    return None
 
 
 def smtp_ready() -> bool:
