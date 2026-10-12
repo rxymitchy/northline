@@ -32,6 +32,9 @@ SIGNAL_PATTERNS = {
     "application_process": [r"apply now", r"application form", r"submit documents"],
     "customer_portal": [r"client portal", r"customer portal", r"login to your account"],
     "manual_followup_language": [r"we will (call|contact|get back)", r"our team will"],
+    "dm_cta": [r"\bdm (me|us)\b", r"send (us )?a dm", r"message us", r"inbox us", r"slide into"],
+    "link_in_bio": [r"link in bio", r"linktr\.ee", r"beacons\.ai", r"stan\.store"],
+    "comments_cta": [r"comment below", r"drop a comment", r"comment .{0,12}(for|to) (price|details|link)"],
 }
 
 
@@ -114,7 +117,7 @@ def research_company(run_id: int, company: dict, quick: bool = False) -> dict:
     }
 
 
-VISITOR_BUDGET_SECONDS = 12.0
+VISITOR_BUDGET_SECONDS = 18.0
 _WALLED_SOCIAL = (
     "facebook.com",
     "fb.com",
@@ -133,7 +136,8 @@ def visitor_research(run_id: int, name: str, url: str, description: str) -> dict
     name = (name or "").strip()
     url = (url or "").strip()
     description = (description or "").strip()
-    skip_home = not url or _is_walled_social(url)
+    skip_home = not url
+    walled = bool(url) and _is_walled_social(url)
 
     homepage = None
     mentions: list[dict] = []
@@ -141,7 +145,12 @@ def visitor_research(run_id: int, name: str, url: str, description: str) -> dict
     def _home() -> dict | None:
         if skip_home:
             return None
-        return _fetch_page_safe(url, 4)
+        page = _fetch_page_safe(url, 5)
+        if page:
+            return page
+        if walled:
+            return _fetch_jina(url, 6)
+        return _fetch_jina(url, 5)
 
     def _search() -> list[dict]:
         return _public_mentions(name, url, description)
@@ -151,12 +160,12 @@ def visitor_research(run_id: int, name: str, url: str, description: str) -> dict
         home_f = pool.submit(_home)
         search_f = pool.submit(_search)
         try:
-            homepage = home_f.result(timeout=min(5.0, max(0.2, deadline - time.monotonic())))
+            homepage = home_f.result(timeout=min(7.0, max(0.2, deadline - time.monotonic())))
         except Exception as exc:
             log_event(run_id, "fetch_error", f"Homepage timed out or failed: {exc}", level="warning")
             homepage = None
         try:
-            mentions = search_f.result(timeout=min(5.0, max(0.2, deadline - time.monotonic()))) or []
+            mentions = search_f.result(timeout=min(8.0, max(0.2, deadline - time.monotonic()))) or []
         except Exception as exc:
             log_event(run_id, "search_error", f"Public mentions search skipped: {exc}", level="warning")
             mentions = []
@@ -168,7 +177,7 @@ def visitor_research(run_id: int, name: str, url: str, description: str) -> dict
         pages.append(homepage)
 
     if homepage and time.monotonic() < deadline - 1.2:
-        extra_urls = _candidate_paths(homepage, _origin(homepage.get("url") or url))[:2]
+        extra_urls = _candidate_paths(homepage, _origin(homepage.get("url") or url))[:3]
         remain = max(0.3, deadline - time.monotonic())
         extra_pool = ThreadPoolExecutor(max_workers=2)
         try:
@@ -183,19 +192,28 @@ def visitor_research(run_id: int, name: str, url: str, description: str) -> dict
         finally:
             extra_pool.shutdown(wait=False, cancel_futures=True)
 
-    if not pages and mentions and time.monotonic() < deadline - 1:
+    if mentions and time.monotonic() < deadline - 1:
         from app.modules.page_type import host_of, is_publisher_host
 
+        extras = []
         for row in mentions:
             href = (row.get("url") or "").strip()
             if not href or _is_walled_social(href):
                 continue
-            if is_publisher_host(host_of(href)):
+            host = host_of(href)
+            if is_publisher_host(host) and not _is_link_in_bio(host):
                 continue
-            page = _fetch_page_safe(href, 3)
+            if any(host == urlparse(p.get("url") or "").netloc.replace("www.", "").lower() for p in pages):
+                continue
+            extras.append(href)
+            if len(extras) >= 2:
+                break
+        for href in extras:
+            if time.monotonic() >= deadline - 0.4:
+                break
+            page = _fetch_page_safe(href, 3) or (_fetch_jina(href, 4) if _is_link_in_bio(urlparse(href).netloc) else None)
             if page:
                 pages.append(page)
-                break
 
     mention_block = _format_mentions(mentions)
     own_host = ""
@@ -232,9 +250,12 @@ def visitor_research(run_id: int, name: str, url: str, description: str) -> dict
         phones = _unique(phones)
     people = sum((p["people"] for p in own_pages), [])
     website = None
-    if pages:
+    owned = next((p for p in pages if not _is_walled_social(p.get("url") or "")), None)
+    if owned:
+        website = _origin(owned["url"])
+    elif pages:
         website = _origin(pages[0]["url"])
-    elif url and not skip_home:
+    elif url:
         website = url
 
     return {
@@ -265,20 +286,85 @@ def _fetch_page_safe(url: str, timeout: int | float) -> dict | None:
         return None
 
 
-def _public_mentions(name: str, url: str, description: str) -> list[dict]:
-    from app.providers.factory import get_search_provider
+def _is_link_in_bio(host: str) -> bool:
+    host = (host or "").lower().replace("www.", "")
+    return any(host == h or host.endswith("." + h) for h in ("linktr.ee", "beacons.ai", "stan.store", "bio.link", "carrd.co"))
 
+
+def _social_handle(url: str) -> str:
+    parsed = urlparse(url or "")
+    parts = [p for p in (parsed.path or "").split("/") if p and p.lower() not in ("reel", "reels", "p", "share", "status", "watch", "posts")]
+    if not parts:
+        return ""
+    handle = parts[0].lstrip("@")
+    if handle.lower() in ("in", "company", "school", "pages", "groups"):
+        handle = parts[1].lstrip("@") if len(parts) > 1 else ""
+    return handle[:40]
+
+
+def _mention_queries(name: str, url: str, description: str) -> list[str]:
     host = urlparse(url or "").netloc.replace("www.", "")
-    parts = [name, host]
-    if not host and description:
-        parts.extend(description.split()[:5])
-    query = " ".join(p for p in parts if p).strip()
-    if len(query) < 3:
+    handle = _social_handle(url) if url and _is_walled_social(url) else ""
+    queries: list[str] = []
+    if name and host:
+        queries.append(f'"{name}" {host}')
+        queries.append(f"{name} {host} contact WhatsApp")
+    elif name:
+        queries.append(name)
+    if host and host not in (name or "").lower():
+        queries.append(host)
+    if handle:
+        net = urlparse(url).netloc.replace("www.", "").split(".")[0]
+        queries.append(f'"{handle}" {net}')
+        queries.append(f"{handle} website")
+        queries.append(f"{handle} WhatsApp OR linktree OR contact")
+    if name and _is_walled_social(url or ""):
+        queries.append(f'"{name}" Instagram OR Facebook OR TikTok OR LinkedIn')
+    if description:
+        bits = " ".join(description.split()[:8])
+        if name and bits:
+            queries.append(f"{name} {bits}")
+    out: list[str] = []
+    seen: set[str] = set()
+    for q in queries:
+        key = " ".join(q.split()).lower()
+        if len(key) < 3 or key in seen:
+            continue
+        seen.add(key)
+        out.append(" ".join(q.split()))
+        if len(out) >= 4:
+            break
+    return out
+
+
+def _public_mentions(name: str, url: str, description: str) -> list[dict]:
+    from app.providers.factory import get_web_search_provider
+
+    queries = _mention_queries(name, url, description)
+    if not queries:
         return []
     try:
-        rows = get_search_provider().search(query, max_results=6)
+        provider = get_web_search_provider()
     except Exception:
         return []
+    rows = []
+    remain = 7.5
+    started = time.monotonic()
+    pool = ThreadPoolExecutor(max_workers=3)
+    try:
+        futs = {pool.submit(_safe_provider_search, provider, q): q for q in queries[:4]}
+        try:
+            for fut in as_completed(futs, timeout=max(0.4, remain)):
+                try:
+                    rows.extend(fut.result() or [])
+                except Exception:
+                    pass
+                if time.monotonic() - started > remain:
+                    break
+        except Exception:
+            pass
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
     out: list[dict] = []
     seen: set[str] = set()
     for row in rows:
@@ -294,9 +380,48 @@ def _public_mentions(name: str, url: str, description: str) -> list[dict]:
                 "host": urlparse(href).netloc.replace("www.", ""),
             }
         )
-        if len(out) >= 6:
+        if len(out) >= 10:
             break
     return out
+
+
+def _safe_provider_search(provider, query: str) -> list:
+    try:
+        return provider.search(query, max_results=8) or []
+    except Exception:
+        return []
+
+
+def _fetch_jina(url: str, timeout: int | float) -> dict | None:
+    if not url.startswith("http"):
+        return None
+    try:
+        resp = http_get("https://r.jina.ai/" + url, timeout=max(3, int(timeout)))
+    except Exception:
+        return None
+    status = getattr(resp, "status_code", 0)
+    if status >= 400:
+        return None
+    text = (response_text(resp) or "").strip()
+    if len(text) < 80:
+        return None
+    title = text.split("\n", 1)[0][:180]
+    emails = _unique(EMAIL_RE.findall(text))
+    phones = _unique(TEL_RE.findall(text) + KENYA_PHONE_RE.findall(text))
+    whatsapps = _unique(WHATSAPP_RE.findall(text))
+    return {
+        "url": url,
+        "title": title,
+        "description": "",
+        "text": text[:12000],
+        "html_sample": text[:4000],
+        "emails": emails,
+        "email_records": [],
+        "phones": [_clean_phone(p) for p in phones],
+        "whatsapps": whatsapps,
+        "people": [],
+        "links": [],
+    }
 
 
 def _format_mentions(mentions: list[dict]) -> str:
@@ -341,6 +466,10 @@ def _fetch_page(url: str, timeout: int | None = None, skip_robots: bool = False)
     md = soup.find("meta", attrs={"name": "description"})
     if md and md.get("content"):
         desc = md["content"]
+    if not desc:
+        og = soup.find("meta", attrs={"property": "og:description"})
+        if og and og.get("content"):
+            desc = og["content"]
     text = re.sub(r"\n{3,}", "\n\n", soup.get_text("\n")).strip()[:12000]
     emails = _unique(EMAIL_RE.findall(html + "\n" + text))
     emails = [e for e in emails if not e.lower().endswith((".png", ".jpg", ".gif", ".webp"))]
@@ -393,6 +522,10 @@ def _candidate_paths(homepage: dict, website: str) -> list[str]:
         "enquire",
         "inquiry",
         "enquiry",
+        "book",
+        "booking",
+        "pricing",
+        "shop",
     )
     urls: list[str] = []
     for href in homepage.get("links") or []:
@@ -404,7 +537,7 @@ def _candidate_paths(homepage: dict, website: str) -> list[str]:
             if urlparse(abs_url).netloc.replace("www.", "") == urlparse(website).netloc.replace("www.", ""):
                 urls.append(abs_url.split("#")[0])
     # Common public paths if not linked
-    for path in ("/contact", "/contact-us", "/about", "/about-us", "/team", "/our-team", "/leadership"):
+    for path in ("/contact", "/contact-us", "/about", "/about-us", "/book", "/booking", "/pricing"):
         urls.append(urljoin(website.rstrip("/") + "/", path.lstrip("/")))
     deduped: list[str] = []
     seen = {homepage["url"]}

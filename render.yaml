@@ -10,8 +10,6 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.8"
-      - key: BOOKING_URL
-        value: https://calendly.com/lucianamitchell19/northline-business-automation
       - key: SEARCH_PROVIDER
         value: duckduckgo
       - key: EMAIL_SENDING_ENABLED

@@ -228,31 +228,41 @@ class VisitorResearchTests(unittest.TestCase):
         self.assertIn("Public web mentions", dx["summary"])
 
 
-class BookingTests(unittest.TestCase):
-    def test_prefills_calendly_name_and_email(self):
-        from app.booking import calendly_href, is_calendly
+class TipTests(unittest.TestCase):
+    def test_callback_must_match_address_host(self):
+        from app.tip import _callback_allowed
 
-        href = calendly_href("https://calendly.com/lucianamitchell19/northline-business-automation", "Alex", "alex@example.com")
-        self.assertIn("calendly.com/lucianamitchell19/northline-business-automation", href)
-        self.assertIn("name=Alex", href)
-        self.assertIn("email=alex%40example.com", href)
-        self.assertTrue(is_calendly(href))
+        self.assertTrue(_callback_allowed("https://blink.sv/lnurlp/x/callback", "satoshirxymitchy@blink.sv"))
+        self.assertFalse(_callback_allowed("https://evil.example/callback", "satoshirxymitchy@blink.sv"))
+        self.assertFalse(_callback_allowed("http://blink.sv/callback", "satoshirxymitchy@blink.sv"))
 
-    def test_rejects_javascript(self):
-        from app.booking import calendly_href
-
-        self.assertEqual(calendly_href("javascript:alert(1)", "Alex", "a@b.com"), "")
-
-    def test_upgrades_http_and_fills_blank_env(self):
+    def test_invoice_response_hides_lightning_address(self):
         from unittest.mock import patch
 
-        from app.booking import DEFAULT_CALENDLY, calendly_href, configured_booking_url
+        from app.tip import create_tip_invoice
 
-        href = calendly_href("http://calendly.com/lucianamitchell19/northline-business-automation", "Alex", "a@b.com")
-        self.assertTrue(href.startswith("https://calendly.com/"))
-        with patch("app.booking.settings") as settings:
-            settings.booking_url = ""
-            self.assertEqual(configured_booking_url(), DEFAULT_CALENDLY)
+        pay = {
+            "tag": "payRequest",
+            "callback": "https://blink.sv/lnurlp/satoshirxymitchy/callback",
+            "minSendable": 1000,
+            "maxSendable": 100000000000,
+        }
+        inv = {"pr": "lnbc10u1ptestinvoice"}
+        with patch("app.tip._get_json", side_effect=[pay, inv]), patch("app.tip._qr_svg", return_value="<svg></svg>"):
+            out = create_tip_invoice(1000)
+        blob = str(out).lower()
+        self.assertTrue(out["invoice"].startswith("ln"))
+        self.assertIn("lightning:", out["wallet_uri"])
+        self.assertNotIn("@blink", blob)
+        self.assertNotIn("satoshirxymitchy", blob)
+
+    def test_social_mention_queries_use_handle(self):
+        from app.modules.research import _mention_queries, _social_handle
+
+        self.assertEqual(_social_handle("https://www.instagram.com/acme.ke/"), "acme.ke")
+        qs = " ".join(_mention_queries("Acme", "https://instagram.com/acme.ke", "we reply on WhatsApp"))
+        self.assertIn("acme.ke", qs.lower())
+        self.assertIn("whatsapp", qs.lower())
 
 
 if __name__ == "__main__":
