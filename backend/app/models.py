@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -33,15 +33,18 @@ class ResearchRun(Base):
 
 class Inquiry(Base):
     __tablename__ = "inquiries"
+    __table_args__ = (UniqueConstraint("email", name="ux_inquiries_email"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     run_id: Mapped[int | None] = mapped_column(ForeignKey("research_runs.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(200))
-    email: Mapped[str] = mapped_column(String(200))
+    email: Mapped[str] = mapped_column(String(200), unique=True, index=True)
     source_kind: Mapped[str] = mapped_column(String(40))
     source_value: Mapped[str] = mapped_column(Text, default="")
     wants_help: Mapped[bool] = mapped_column(Boolean, default=False)
+    search_count: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class Company(Base):

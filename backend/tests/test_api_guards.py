@@ -17,10 +17,45 @@ class ApiGuardTests(unittest.TestCase):
         )
         self.assertEqual(r.status_code, 400)
 
+    def test_search_rejects_example_dot_com(self):
+        r = self.client.post(
+            "/api/search",
+            data={"name": "Ada", "email": "ada@example.com", "source": "describe", "description": "WhatsApp and Excel every day by hand."},
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("real personal or company", (r.json().get("detail") or "").lower())
+
+    def test_search_rejects_incomplete_website(self):
+        r = self.client.post(
+            "/api/search",
+            data={"name": "Alex", "email": "alex@gmail.com", "source": "website", "url": ""},
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_search_rejects_blank_name(self):
+        r = self.client.post(
+            "/api/search",
+            data={
+                "name": " ",
+                "email": "alex@gmail.com",
+                "source": "website",
+                "url": "https://northline.example.org",
+            },
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_search_rejects_csv_without_note(self):
+        r = self.client.post(
+            "/api/search",
+            data={"name": "Alex", "email": "alex@gmail.com", "source": "csv", "description": ""},
+            files={"file": ("leads.csv", b"name,phone\nJane,0711\n", "text/csv")},
+        )
+        self.assertEqual(r.status_code, 400)
+
     def test_search_rejects_short_description(self):
         r = self.client.post(
             "/api/search",
-            data={"name": "Alex", "email": "alex@example.com", "source": "describe", "description": "too short"},
+            data={"name": "Alex", "email": "alex@gmail.com", "source": "describe", "description": "too short"},
         )
         self.assertEqual(r.status_code, 400)
 
@@ -51,7 +86,7 @@ class ApiGuardTests(unittest.TestCase):
             "/api/search",
             data={
                 "name": "Alex",
-                "email": "alex@example.com",
+                "email": "alex@gmail.com",
                 "source": "describe",
                 "description": "Leads come on WhatsApp. Someone copies them into Excel. Follow-up is typed by hand.",
             },
@@ -86,7 +121,7 @@ class ApiGuardTests(unittest.TestCase):
             "/api/search",
             data={
                 "name": "Alex",
-                "email": "alex@example.com",
+                "email": "alex@gmail.com",
                 "source": "csv",
                 "description": "This is our lead list exported from WhatsApp follow-up.",
             },
@@ -102,6 +137,37 @@ class ApiGuardTests(unittest.TestCase):
             time.sleep(0.25)
         self.assertEqual(payload.get("status"), "completed", payload)
         self.assertEqual((payload.get("result") or {}).get("source"), "csv")
+
+    def test_repeat_email_keeps_one_inquiry(self):
+        from app.db import SessionLocal
+        from app.models import Inquiry
+
+        payload = {
+            "name": "Alex",
+            "email": "Alex@Gmail.com",
+            "source": "describe",
+            "description": "Leads come on WhatsApp. Someone copies them into Excel by hand every day.",
+        }
+        first = self.client.post("/api/search", data=payload)
+        self.assertEqual(first.status_code, 200, first.text)
+        for _ in range(80):
+            st = self.client.get(f"/api/runs/{first.json()['id']}").json()
+            if st.get("status") in ("completed", "failed"):
+                break
+            time.sleep(0.25)
+        second = self.client.post(
+            "/api/search",
+            data={**payload, "name": "Alexandra", "email": "alex@gmail.com"},
+        )
+        self.assertEqual(second.status_code, 200, second.text)
+        db = SessionLocal()
+        try:
+            rows = db.query(Inquiry).filter(Inquiry.email == "alex@gmail.com").all()
+            self.assertEqual(len(rows), 1)
+            self.assertGreaterEqual(rows[0].search_count, 2)
+            self.assertEqual(rows[0].name, "Alexandra")
+        finally:
+            db.close()
 
     def test_wrong_admin_pin(self):
         r = self.client.post("/api/admin/unlock", json={"pin": "definitely-wrong-pin-xx"})

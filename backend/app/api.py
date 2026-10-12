@@ -1,24 +1,43 @@
 import hmac
 import json
+import re
+from datetime import datetime, timezone
 from threading import Thread
+from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.emailer import smtp_ready, valid_email
+from app.emailer import email_reject_reason, smtp_ready
 from app.db import get_db
 from app.export_csv import export_run_csv
 from app.models import Company, Contact, EventLog, Inquiry, Opportunity, Outreach, ResearchRun
 from app.pipeline import run_pipeline
 from app.playbook import DEFAULT_ICP
 from app.self_analysis import compose_brief, email_report, run_search
-from app.tip import PRESET_SATS, create_tip_invoice
+from app.tip import PRESET_SATS, create_tip_invoice, tip_rate_ok
 
 
 router = APIRouter()
+
+
+def _has_public_link(url: str) -> bool:
+    raw = (url or "").strip()
+    if not raw or any(ch.isspace() for ch in raw):
+        return False
+    candidate = raw if re.match(r"^https?://", raw, re.I) else "https://" + raw
+    parsed = urlparse(candidate)
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme not in ("http", "https"):
+        return False
+    if not host or "." not in host:
+        return False
+    if host in ("localhost", "127.0.0.1") or host.endswith(".local"):
+        return False
+    return True
 
 
 def _admin_ok(pin: str | None) -> bool:
@@ -69,18 +88,24 @@ async def create_search(
     file: UploadFile | None = File(None),
 ):
     name = (name or "").strip()
-    email = (email or "").strip()
+    email = (email or "").strip().lower()
     source = (source or "").strip().lower()
     url = (url or "").strip()
     description = (description or "").strip()
-    if not name:
+    if len(name) < 2:
         raise HTTPException(400, "Add your name")
-    if not valid_email(email):
-        raise HTTPException(400, "Enter a valid email address")
+    blocked = email_reject_reason(email)
+    if blocked:
+        raise HTTPException(400, blocked)
     if source not in ("website", "social", "csv", "describe"):
         raise HTTPException(400, "Choose how you work")
     csv_text = ""
+    if source in ("website", "social"):
+        if not _has_public_link(url):
+            raise HTTPException(400, "Add the full website or profile link")
     if source == "csv":
+        if len(description) < 20:
+            raise HTTPException(400, "Add a short note about follow-up")
         if not file:
             raise HTTPException(400, "Attach a CSV or spreadsheet export")
         raw = await file.read()
@@ -88,8 +113,6 @@ async def create_search(
             raise HTTPException(400, "File is too large")
         csv_text = raw.decode("utf-8", errors="replace")[:20000]
         description = (description + "\n" + csv_text).strip()
-    if source in ("website", "social") and not url:
-        raise HTTPException(400, "Add the link")
     if source == "describe" and len(description) < 20:
         raise HTTPException(400, "Tell us a little more about how work moves today")
     payload = {
@@ -100,18 +123,36 @@ async def create_search(
         "description": description,
         "filename": file.filename if file else "",
     }
+    inquiry = db.query(Inquiry).filter(Inquiry.email == email).first()
+    if inquiry and inquiry.run_id:
+        live = db.get(ResearchRun, inquiry.run_id)
+        if live and live.kind == "search" and live.status in ("queued", "running"):
+            return {"id": live.id, "status": live.status, "lead_saved": True, "reused": True}
     run = ResearchRun(icp_text=json.dumps(payload), status="queued", kind="search")
     db.add(run)
     db.commit()
     db.refresh(run)
-    inquiry = Inquiry(
-        run_id=run.id,
-        name=name,
-        email=email,
-        source_kind=source,
-        source_value=(url or description or csv_text)[:4000],
-    )
-    db.add(inquiry)
+    now = datetime.now(timezone.utc)
+    detail = (url or description or csv_text)[:4000]
+    if inquiry:
+        inquiry.name = name
+        inquiry.run_id = run.id
+        inquiry.source_kind = source
+        inquiry.source_value = detail
+        inquiry.search_count = int(inquiry.search_count or 1) + 1
+        inquiry.updated_at = now
+    else:
+        db.add(
+            Inquiry(
+                run_id=run.id,
+                name=name,
+                email=email,
+                source_kind=source,
+                source_value=detail,
+                search_count=1,
+                updated_at=now,
+            )
+        )
     db.commit()
     Thread(target=run_search, args=(run.id,), daemon=True).start()
     return {"id": run.id, "status": run.status, "lead_saved": True}
@@ -123,6 +164,14 @@ def request_help(run_id: int, db: Session = Depends(get_db)):
     if not run or (getattr(run, "kind", None) or "") != "search":
         raise HTTPException(404, "Not found")
     inquiry = db.query(Inquiry).filter(Inquiry.run_id == run_id).order_by(Inquiry.id.desc()).first()
+    if not inquiry:
+        try:
+            sub = json.loads(run.icp_text or "{}")
+        except Exception:
+            sub = {}
+        email = str((sub or {}).get("email") or "").strip().lower()
+        if email:
+            inquiry = db.query(Inquiry).filter(Inquiry.email == email).first()
     if not inquiry:
         raise HTTPException(400, "No lead was saved for this diagnosis.")
     inquiry.wants_help = True
@@ -140,7 +189,10 @@ def tip_options():
 
 
 @router.post("/tip")
-def create_tip(payload: TipRequest):
+def create_tip(payload: TipRequest, request: Request):
+    ip = (request.client.host if request.client else "") or "unknown"
+    if not tip_rate_ok(ip):
+        raise HTTPException(429, "Too many tip requests. Wait a minute and try again.")
     try:
         return create_tip_invoice(payload.amount_sats)
     except ValueError as exc:
@@ -163,6 +215,7 @@ def list_leads(db: Session = Depends(get_db), x_admin_pin: str | None = Header(d
             "source": row.source_kind,
             "detail": (row.source_value or "")[:240],
             "wants_help": bool(getattr(row, "wants_help", False)),
+            "search_count": int(getattr(row, "search_count", 1) or 1),
             "created_at": row.created_at.isoformat() if row.created_at else None,
         }
         for row in rows
