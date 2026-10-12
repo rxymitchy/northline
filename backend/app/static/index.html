@@ -60,6 +60,9 @@
     .btn.primary:hover { background: var(--blue-hover); }
     .btn.primary:disabled, .btn.ghost:disabled { opacity: .5; cursor: default; }
     .btn.ghost { background: #fff; color: var(--blue); border: 1px solid var(--blue); width: 100%; margin-top: 10px; text-decoration: none; }
+    .btn.green { background: #15803d; color: #fff; width: 100%; margin-top: 10px; gap: 8px; }
+    .btn.green:hover { background: #166534; }
+    .stars { color: #facc15; letter-spacing: 1px; font-size: 15px; line-height: 1; }
     .err { color: #b91c1c; font-size: 14px; text-align: center; min-height: 20px; margin-top: 10px; }
     .ok { color: #166534; }
     .hidden { display: none !important; }
@@ -103,7 +106,9 @@
     .tip-amts button { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font: 600 13px/1 inherit; cursor: pointer; }
     .tip-amts button:hover, .tip-amts button.on { border-color: var(--blue); color: var(--blue); }
     .qr { display: flex; justify-content: center; margin: 12px 0; }
-    .qr svg { width: 196px; height: 196px; background: #fff; padding: 8px; border-radius: 12px; border: 1px solid var(--line); }
+    .qr img { width: 240px; height: 240px; background: #fff; padding: 10px; border-radius: 12px; border: 1px solid var(--line); image-rendering: pixelated; }
+    .tip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .tip-row .btn { width: auto; flex: 1; min-width: 140px; margin-top: 0; }
   </style>
 </head>
 <body>
@@ -127,7 +132,7 @@
       <p class="path-hint" id="pathHint">Paste the company website.</p>
       <div id="urlWrap">
         <label id="urlLabel" for="url">Website</label>
-        <input id="url" type="url" placeholder="https://" />
+        <input id="url" type="url" placeholder="https://" required />
       </div>
       <div id="fileWrap" class="hidden">
         <label for="file">CSV or export</label>
@@ -135,10 +140,10 @@
       </div>
       <div id="descWrap" class="hidden">
         <label for="description">How work moves today</label>
-        <textarea id="description" placeholder="Who takes the lead, where it sits, what you still do by hand…"></textarea>
+        <textarea id="description" placeholder="Who takes the lead, where it sits, what you still do by hand…" minlength="20"></textarea>
       </div>
       <label for="name">Your name</label>
-      <input id="name" type="text" autocomplete="name" required />
+      <input id="name" type="text" autocomplete="name" required minlength="2" />
       <label for="email">Email</label>
       <input id="email" type="email" autocomplete="email" required />
       <button class="btn primary" id="searchBtn" type="submit">See the diagnosis</button>
@@ -155,8 +160,8 @@
       <p class="hint" id="hint">Looking at your site plus public mentions of the company. Usually 10–20 seconds.</p>
       <div id="results" class="cards hidden"></div>
       <div class="actions">
-        <button class="btn primary hidden" id="downloadBtn" type="button">Download the full report</button>
-        <button class="btn ghost hidden" id="tipBtn" type="button">Tip us in bitcoin</button>
+        <button class="btn green hidden" id="downloadBtn" type="button">Download the full report</button>
+        <button class="btn green hidden" id="tipBtn" type="button">Tip us <span class="stars" aria-hidden="true">★★★</span></button>
       </div>
       <div id="tipBox" class="card hidden" style="margin-top:16px">
         <h2>Tip Northline</h2>
@@ -164,10 +169,13 @@
         <div class="tip-amts">
           <button type="button" data-sats="1000">1,000 sats</button>
           <button type="button" data-sats="5000">5,000 sats</button>
-          <button type="button" data-sats="21000">21,000 sats</button>
+          <button type="button" data-sats="10000">10,000 sats</button>
         </div>
         <div class="qr" id="tipQr"></div>
-        <a class="btn ghost hidden" id="tipOpen" href="#" rel="noopener">Open in wallet</a>
+        <div class="tip-row">
+          <button class="btn green hidden" id="tipOpen" type="button">Open in wallet</button>
+          <button class="btn ghost hidden" id="tipCopy" type="button">Copy invoice</button>
+        </div>
         <p class="caveat" id="tipStatus"></p>
       </div>
       <p class="note" id="note"></p>
@@ -186,9 +194,16 @@ const RESULT_KEY = "northline-result";
 function setSource(next, save){
   source = next || "website";
   document.querySelectorAll(".choice").forEach(b => b.classList.toggle("on", b.dataset.source===source));
-  document.getElementById("urlWrap").classList.toggle("hidden", source==="csv" || source==="describe");
-  document.getElementById("fileWrap").classList.toggle("hidden", source!=="csv");
-  document.getElementById("descWrap").classList.toggle("hidden", source!=="describe" && source!=="csv");
+  const needUrl = source==="website" || source==="social";
+  const needFile = source==="csv";
+  const needDesc = source==="describe" || source==="csv";
+  document.getElementById("urlWrap").classList.toggle("hidden", !needUrl);
+  document.getElementById("fileWrap").classList.toggle("hidden", !needFile);
+  document.getElementById("descWrap").classList.toggle("hidden", !needDesc);
+  document.getElementById("url").required = needUrl;
+  document.getElementById("file").required = needFile;
+  document.getElementById("description").required = needDesc;
+  document.getElementById("description").minLength = needDesc ? 20 : 0;
   document.getElementById("urlLabel").textContent = source==="social" ? "Social profile link" : "Website";
   const hints = {
     website: "Paste the company website.",
@@ -279,6 +294,10 @@ function clearMine(){
   document.getElementById("tipBtn").classList.add("hidden");
   document.getElementById("tipBox").classList.add("hidden");
   document.getElementById("tipQr").innerHTML = "";
+  const tipOpen = document.getElementById("tipOpen");
+  const tipCopy = document.getElementById("tipCopy");
+  if (tipOpen) tipOpen.classList.add("hidden");
+  if (tipCopy) tipCopy.classList.add("hidden");
   setNote("", "");
   setSource("website", false);
   showForm();
@@ -305,15 +324,36 @@ window.addEventListener("popstate", (ev) => {
     watch();
   } else showForm(false);
 });
+function missingFields(){
+  const name = document.getElementById("name").value.trim();
+  const email = document.getElementById("email").value.trim();
+  const url = document.getElementById("url").value.trim();
+  const desc = document.getElementById("description").value.trim();
+  const file = document.getElementById("file").files[0];
+  if (name.length < 2) return "Enter your name.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Enter a valid email address.";
+  if (source === "website" || source === "social") {
+    if (!url) return "Fill in every field — add the link.";
+  }
+  if (source === "csv") {
+    if (!file) return "Fill in every field — attach the file.";
+    if (desc.length < 20) return "Fill in every field — add a short note about follow-up.";
+  }
+  if (source === "describe" && desc.length < 20) {
+    return "Fill in every field — tell us a little more about how work moves today.";
+  }
+  return "";
+}
 document.getElementById("form").onsubmit = async (e) => {
   e.preventDefault();
   const err = document.getElementById("err");
   err.textContent = "";
-  const email = document.getElementById("email").value.trim();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    err.textContent = "Enter a valid email address.";
+  const gap = missingFields();
+  if (gap) {
+    err.textContent = gap;
     return;
   }
+  const email = document.getElementById("email").value.trim();
   const fd = new FormData();
   fd.append("name", document.getElementById("name").value.trim());
   fd.append("email", email);
@@ -429,23 +469,50 @@ async function loadTip(sats){
   const status = document.getElementById("tipStatus");
   const qr = document.getElementById("tipQr");
   const open = document.getElementById("tipOpen");
+  const copyBtn = document.getElementById("tipCopy");
   status.textContent = "Making a one-time Lightning invoice…";
-  qr.innerHTML = "";
+  qr.replaceChildren();
   open.classList.add("hidden");
+  copyBtn.classList.add("hidden");
+  open.onclick = null;
+  copyBtn.onclick = null;
   try {
     const r = await fetch("/api/tip", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({amount_sats: sats})});
     const data = await r.json().catch(()=>({}));
     if (!r.ok) throw new Error(typeof data.detail==="string" ? data.detail : "Could not create invoice");
-    if ((data.invoice || "").toLowerCase().includes("@") || (data.qr_svg || "").toLowerCase().includes("@blink")) {
+    const invoice = String(data.invoice || "").trim().toLowerCase();
+    const uri = String(data.wallet_uri || "").trim();
+    const png = String(data.qr_png || "");
+    if (!invoice.startsWith("ln") || invoice.includes("@") || invoice.includes("/") || invoice.includes(":") ) {
       throw new Error("Could not create invoice");
     }
-    qr.innerHTML = data.qr_svg || "";
-    if (data.wallet_uri) {
-      open.href = data.wallet_uri;
-      open.classList.remove("hidden");
+    if (!uri.startsWith("lightning:ln") || uri.includes("@")) {
+      throw new Error("Could not create invoice");
     }
-    status.textContent = "Scan with Phoenix, Blink, Wallet of Satoshi, Zeus, or another Lightning wallet. "+(data.amount_sats||sats).toLocaleString()+" sats.";
-    setNote("Invoice ready. Scan the QR — it does not show a wallet address.", "good");
+    if (!png.startsWith("data:image/png;base64,")) {
+      throw new Error("Could not create invoice");
+    }
+    const img = document.createElement("img");
+    img.alt = "Lightning invoice QR code";
+    img.width = 240;
+    img.height = 240;
+    img.src = png;
+    qr.appendChild(img);
+    open.classList.remove("hidden");
+    copyBtn.classList.remove("hidden");
+    open.onclick = () => {
+      window.location.assign(uri);
+    };
+    copyBtn.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(invoice);
+        status.textContent = "Invoice copied. Paste it in Phoenix, Blink, Wallet of Satoshi, or Zeus.";
+      } catch (ex) {
+        status.textContent = "Select and copy the invoice from Open in wallet if your browser blocked copy.";
+      }
+    };
+    status.textContent = "Scan the QR with a Lightning wallet, or tap Open in wallet. "+(data.amount_sats||sats).toLocaleString()+" sats.";
+    setNote("Invoice ready. Scan the QR, open a wallet, or copy the invoice.", "good");
   } catch (ex) {
     status.textContent = ex.message || "Lightning is unavailable right now.";
     setNote("Could not create a Lightning invoice. Try again in a moment.", "bad");

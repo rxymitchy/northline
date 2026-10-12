@@ -12,7 +12,8 @@ from app.brief import build_brief
 
 class EmailValidationTests(unittest.TestCase):
     def test_accepts_normal_address(self):
-        self.assertTrue(valid_email("alex@example.com"))
+        self.assertTrue(valid_email("alex@gmail.com"))
+        self.assertTrue(valid_email("ops@malprimescents.co.ke"))
 
     def test_rejects_empty_and_garbage(self):
         self.assertFalse(valid_email(""))
@@ -20,9 +21,15 @@ class EmailValidationTests(unittest.TestCase):
         self.assertFalse(valid_email("a@b"))
         self.assertFalse(valid_email("alex@example"))
 
+    def test_rejects_dummy_and_disposable_domains(self):
+        self.assertFalse(valid_email("ada@example.com"))
+        self.assertFalse(valid_email("qa@mail.example.com"))
+        self.assertFalse(valid_email("temp@mailinator.com"))
+        self.assertFalse(valid_email("bot@something.test"))
+
     @patch("app.emailer.smtp_ready", return_value=False)
     def test_smtp_unconfigured_does_not_send(self, _ready):
-        result = send_email("alex@example.com", "Subject", "Body", html="<p>Hi</p>")
+        result = send_email("alex@gmail.com", "Subject", "Body", html="<p>Hi</p>")
         self.assertFalse(result["sent"])
         self.assertEqual(result["code"], "smtp_unconfigured")
 
@@ -235,6 +242,8 @@ class TipTests(unittest.TestCase):
         self.assertTrue(_callback_allowed("https://blink.sv/lnurlp/x/callback", "satoshirxymitchy@blink.sv"))
         self.assertFalse(_callback_allowed("https://evil.example/callback", "satoshirxymitchy@blink.sv"))
         self.assertFalse(_callback_allowed("http://blink.sv/callback", "satoshirxymitchy@blink.sv"))
+        self.assertFalse(_callback_allowed("https://127.0.0.1/callback", "satoshirxymitchy@blink.sv"))
+        self.assertFalse(_callback_allowed("https://user:pass@blink.sv/callback", "satoshirxymitchy@blink.sv"))
 
     def test_invoice_response_hides_lightning_address(self):
         from unittest.mock import patch
@@ -247,14 +256,26 @@ class TipTests(unittest.TestCase):
             "minSendable": 1000,
             "maxSendable": 100000000000,
         }
-        inv = {"pr": "lnbc10u1ptestinvoice"}
-        with patch("app.tip._get_json", side_effect=[pay, inv]), patch("app.tip._qr_svg", return_value="<svg></svg>"):
+        fake = "lnbc10u1p" + ("q" * 40)
+        inv = {"pr": fake.upper()}
+        with patch("app.tip._get_json", side_effect=[pay, inv]):
             out = create_tip_invoice(1000)
         blob = str(out).lower()
-        self.assertTrue(out["invoice"].startswith("ln"))
-        self.assertIn("lightning:", out["wallet_uri"])
+        self.assertTrue(out["invoice"].startswith("lnbc"))
+        self.assertTrue(out["wallet_uri"].startswith("lightning:lnbc"))
+        self.assertTrue(out["qr_png"].startswith("data:image/png;base64,"))
         self.assertNotIn("@blink", blob)
         self.assertNotIn("satoshirxymitchy", blob)
+
+    def test_rejects_junk_invoices(self):
+        from app.tip import _clean_invoice
+
+        with self.assertRaises(RuntimeError):
+            _clean_invoice("https://evil.example/lnbc")
+        with self.assertRaises(RuntimeError):
+            _clean_invoice("satoshi@blink.sv")
+        with self.assertRaises(RuntimeError):
+            _clean_invoice("javascript:alert(1)")
 
     def test_social_mention_queries_use_handle(self):
         from app.modules.research import _mention_queries, _social_handle
