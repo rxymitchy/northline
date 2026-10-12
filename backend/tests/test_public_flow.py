@@ -95,6 +95,11 @@ class BriefTests(unittest.TestCase):
         self.assertIn("BUSINESS OPERATIONS SNAPSHOT", brief["text"])
         self.assertIn("Alex", brief["html"])
         self.assertIn("Overall manual dependency", brief["html"])
+        from app.report_pdf import build_brief_pdf
+
+        pdf = build_brief_pdf(brief, "Alex", "")
+        self.assertTrue(pdf.startswith(b"%PDF"))
+        self.assertGreater(len(pdf), 800)
 
 
 class IndustryGuessTests(unittest.TestCase):
