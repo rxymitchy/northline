@@ -17,6 +17,7 @@ from app.export_csv import export_run_csv
 from app.models import Company, Contact, EventLog, Inquiry, Opportunity, Outreach, ResearchRun
 from app.pipeline import run_pipeline
 from app.playbook import DEFAULT_ICP
+from app.report_pdf import build_brief_pdf
 from app.self_analysis import compose_brief, email_report, run_search
 from app.tip import PRESET_SATS, create_tip_invoice, tip_rate_ok
 
@@ -270,14 +271,17 @@ def download_report(run_id: int, db: Session = Depends(get_db)):
     company.fact_inference = json.dumps(fi)
     db.add(company)
     db.commit()
-    html = brief.get("html")
-    if not html:
+    try:
+        pdf = build_brief_pdf(brief, company.name or "Report", company.website or "")
+    except Exception:
+        raise HTTPException(400, "The report could not be built. Try the analysis again.")
+    if not pdf or not pdf.startswith(b"%PDF"):
         raise HTTPException(400, "The report could not be built. Try the analysis again.")
     safe = "".join(c if c.isalnum() else "-" for c in (company.name or "northline"))[:40]
     return Response(
-        content=html.encode("utf-8"),
-        media_type="text/html; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{safe}-northline-report.html"'},
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{safe}-northline-report.pdf"'},
     )
 
 

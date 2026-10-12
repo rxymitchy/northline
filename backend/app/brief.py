@@ -40,6 +40,7 @@ def build_brief(
         "similar": similar,
         "doing_it_right": right,
         "diagnosis": diagnosis,
+        "channel": channel or {},
         "emailed": emailed,
     }
 
