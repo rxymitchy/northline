@@ -19,7 +19,7 @@ from app.pipeline import run_pipeline
 from app.playbook import DEFAULT_ICP
 from app.report_pdf import build_brief_pdf
 from app.self_analysis import compose_brief, email_report, run_search
-from app.tip import PRESET_SATS, create_tip_invoice, tip_rate_ok
+from app.tip import create_tip_invoice, tip_menu, tip_rate_ok
 
 
 router = APIRouter()
@@ -186,7 +186,7 @@ def request_help(run_id: int, db: Session = Depends(get_db)):
 
 @router.get("/tip")
 def tip_options():
-    return {"ok": True, "amounts_sats": list(PRESET_SATS)}
+    return tip_menu()
 
 
 @router.post("/tip")

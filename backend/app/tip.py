@@ -23,6 +23,7 @@ MIN_SATS = 100
 MAX_SATS = 2_000_000
 _INVOICE_RE = re.compile(r"^ln(bc|tbs|bcrt)[0-9]*[munp]?1[ac-hj-np-z02-9]{20,}$")
 _TIP_HITS: dict[str, list[float]] = {}
+_BTC_USD = {"price": 0.0, "at": 0.0}
 
 
 def configured_lightning_address() -> str:
@@ -58,6 +59,66 @@ def tip_rate_ok(ip: str, limit: int = 12, window: float = 60.0) -> bool:
     return True
 
 
+def bitcoin_usd() -> float:
+    now = time.time()
+    cached = float(_BTC_USD.get("price") or 0)
+    fetched_at = float(_BTC_USD.get("at") or 0)
+    if cached > 0 and now - fetched_at < 600:
+        return cached
+    price = _fetch_btc_usd()
+    if price > 0:
+        _BTC_USD["price"] = price
+        _BTC_USD["at"] = now
+        return price
+    return cached
+
+
+def usd_label(sats: int, btc_usd: float | None = None) -> str:
+    rate = bitcoin_usd() if btc_usd is None else float(btc_usd or 0)
+    if rate <= 0:
+        return ""
+    dollars = (max(int(sats), 0) / 100_000_000) * rate
+    return f"${dollars:,.2f}"
+
+
+def tip_menu() -> dict:
+    rate = bitcoin_usd()
+    amounts = [{"sats": sats, "usd": usd_label(sats, rate)} for sats in PRESET_SATS]
+    return {
+        "ok": True,
+        "amounts_sats": list(PRESET_SATS),
+        "amounts": amounts,
+        "btc_usd": round(rate, 2) if rate else None,
+    }
+
+
+def _fetch_btc_usd() -> float:
+    sources = (
+        ("https://mempool.space/api/v1/prices", lambda d: float(d.get("USD") or 0)),
+        (
+            "https://api.coinbase.com/v2/prices/BTC-USD/spot",
+            lambda d: float((d.get("data") or {}).get("amount") or 0),
+        ),
+    )
+    headers = {"Accept": "application/json", "User-Agent": "Mozilla/5.0 (compatible; Northline/1.0)"}
+    for url, pick in sources:
+        for verify in (True, False):
+            try:
+                with httpx.Client(verify=verify, timeout=4.0, follow_redirects=True) as client:
+                    response = client.get(url, headers=headers)
+                if response.status_code >= 300:
+                    continue
+                data = response.json()
+                if not isinstance(data, dict):
+                    continue
+                price = pick(data)
+                if 1_000 < price < 10_000_000:
+                    return price
+            except Exception:
+                continue
+    return 0.0
+
+
 def create_tip_invoice(amount_sats: int) -> dict:
     sats = int(amount_sats or 0)
     if sats < MIN_SATS or sats > MAX_SATS:
@@ -87,6 +148,7 @@ def create_tip_invoice(amount_sats: int) -> dict:
         "wallet_uri": uri,
         "qr_png": png,
         "expires_hint": "Scan with Phoenix, Blink, Wallet of Satoshi, Zeus, or any Lightning wallet. The invoice is one-time.",
+        "amount_usd": usd_label(sats, float(_BTC_USD.get("price") or 0)),
     }
 
 
