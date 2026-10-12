@@ -103,8 +103,13 @@
     .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; }
     .toolbar .btn.ghost { width: auto; margin-top: 0; min-height: 40px; padding: 0 14px; font-size: 14px; }
     .tip-amts { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
-    .tip-amts button { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font: 600 13px/1 inherit; cursor: pointer; }
+    .tip-amts button {
+      background: #fff; border: 1px solid var(--line); border-radius: 8px;
+      padding: 8px 14px; font: 600 13px/1 inherit; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1;
+    }
     .tip-amts button:hover, .tip-amts button.on { border-color: var(--blue); color: var(--blue); }
+    .tip-usd { color: #15803d; font-size: 12px; font-weight: 700; min-height: 14px; }
     .qr { display: flex; justify-content: center; margin: 12px 0; }
     .qr img { width: 240px; height: 240px; background: #fff; padding: 10px; border-radius: 12px; border: 1px solid var(--line); image-rendering: pixelated; }
     .tip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
@@ -191,9 +196,9 @@
       <h2 id="tipTitle">Tip us</h2>
       <p>Did this help? Tip us for a job well done. We take Bitcoin over Lightning — scan the code or copy the link.</p>
       <div class="tip-amts">
-        <button type="button" data-sats="1000">1,000 sats</button>
-        <button type="button" data-sats="5000">5,000 sats</button>
-        <button type="button" data-sats="10000">10,000 sats</button>
+        <button type="button" data-sats="1000">1,000 sats<span class="tip-usd"></span></button>
+        <button type="button" data-sats="5000">5,000 sats<span class="tip-usd"></span></button>
+        <button type="button" data-sats="10000">10,000 sats<span class="tip-usd"></span></button>
       </div>
       <div class="qr" id="tipQr"></div>
       <button class="btn green hidden" id="tipCopy" type="button">Copy link</button>
@@ -478,7 +483,20 @@ function setNote(text, kind){
 function openTipModal(afterDownload){
   document.getElementById("tipDone").classList.toggle("hidden", !afterDownload);
   document.getElementById("tipModal").classList.remove("hidden");
+  fillTipUsd();
   loadTip(1000);
+}
+async function fillTipUsd(){
+  try {
+    const r = await fetch("/api/tip");
+    const data = await r.json().catch(()=>({}));
+    const rows = data.amounts || [];
+    document.querySelectorAll(".tip-amts button").forEach(btn => {
+      const row = rows.find(a => Number(a.sats) === Number(btn.dataset.sats));
+      const el = btn.querySelector(".tip-usd");
+      if (el) el.textContent = (row && row.usd) ? row.usd : "";
+    });
+  } catch (ex) {}
 }
 function closeTipModal(){
   document.getElementById("tipModal").classList.add("hidden");
@@ -533,6 +551,10 @@ async function loadTip(sats){
         status.textContent = "Copy was blocked. Scan the code instead.";
       }
     };
+    if (data.amount_usd) {
+      const usdEl = document.querySelector(".tip-amts button.on .tip-usd");
+      if (usdEl) usdEl.textContent = data.amount_usd;
+    }
     status.textContent = "Ready. Scan the code or copy the link.";
     setNote("Thank you. Scan the code or copy the link.", "good");
   } catch (ex) {
