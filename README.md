@@ -25,7 +25,7 @@ The first visit after idle can take about a minute (the free instance sleeps). T
 2. Add name and email, then **See the diagnosis**.
 3. Northline reads what you sent **and** a short public web search for the company, in parallel, usually in **10–20 seconds**.
 4. Snapshot: overall manual dependency, which processes still wait on a person, what to automate first, suggested workflow.
-5. **Download the full report**. **Tip us in bitcoin** makes a one-time Lightning invoice you can scan.
+5. **Download the full report**. **Tip us** makes a one-time Lightning invoice you can scan.
 
 Visitor diagnosis stays heuristic: no OpenAI, no invented emails, no login/CAPTCHA bypass.
 

@@ -34,3 +34,21 @@ def init_db():
         inquiry_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(inquiries)"))]
         if inquiry_cols and "wants_help" not in inquiry_cols:
             conn.execute(text("ALTER TABLE inquiries ADD COLUMN wants_help BOOLEAN DEFAULT 0"))
+        if inquiry_cols and "search_count" not in inquiry_cols:
+            conn.execute(text("ALTER TABLE inquiries ADD COLUMN search_count INTEGER DEFAULT 1"))
+        if inquiry_cols and "updated_at" not in inquiry_cols:
+            conn.execute(text("ALTER TABLE inquiries ADD COLUMN updated_at DATETIME"))
+        if inquiry_cols:
+            conn.execute(
+                text(
+                    "UPDATE inquiries SET email = lower(trim(email)) "
+                    "WHERE email IS NOT NULL AND email != lower(trim(email))"
+                )
+            )
+            conn.execute(
+                text(
+                    "DELETE FROM inquiries WHERE id NOT IN "
+                    "(SELECT MIN(id) FROM inquiries GROUP BY email)"
+                )
+            )
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_inquiries_email ON inquiries(email)"))
