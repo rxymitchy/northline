@@ -240,6 +240,14 @@ class VisitorResearchTests(unittest.TestCase):
         self.assertIn("Public web mentions", dx["summary"])
 
 
+class DatabaseUrlTests(unittest.TestCase):
+    def test_postgres_scheme_is_normalized(self):
+        from app.db import database_url
+
+        self.assertTrue(database_url())
+        self.assertFalse(database_url().startswith("postgres://"))
+
+
 class TipTests(unittest.TestCase):
     def test_callback_must_match_address_host(self):
         from app.tip import _callback_allowed
