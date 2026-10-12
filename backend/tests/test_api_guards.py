@@ -173,9 +173,84 @@ class ApiGuardTests(unittest.TestCase):
         finally:
             db.close()
 
+    def test_sixth_search_requires_lightning_payment(self):
+        from unittest.mock import patch
+
+        from app.db import SessionLocal
+        from app.models import Inquiry
+
+        payload = {
+            "name": "Alex",
+            "email": "paywall@gmail.com",
+            "source": "describe",
+            "description": "Leads come on WhatsApp. Someone copies them into Excel by hand every day.",
+        }
+        first = self.client.post("/api/search", data=payload)
+        self.assertEqual(first.status_code, 200, first.text)
+        for _ in range(80):
+            st = self.client.get(f"/api/runs/{first.json()['id']}").json()
+            if st.get("status") in ("completed", "failed"):
+                break
+            time.sleep(0.25)
+        db = SessionLocal()
+        try:
+            row = db.query(Inquiry).filter(Inquiry.email == "paywall@gmail.com").one()
+            row.search_count = 5
+            db.commit()
+        finally:
+            db.close()
+        fake = {
+            "ok": True,
+            "amount_sats": 1000,
+            "amount_usd": "$0.80",
+            "invoice": "lnbc10u1p" + ("q" * 40),
+            "qr_png": "data:image/png;base64,aaaa",
+            "wallet_uri": "lightning:lnbc",
+        }
+        with patch("app.api.create_tip_invoice", return_value=fake):
+            blocked = self.client.post("/api/search", data=payload)
+        self.assertEqual(blocked.status_code, 402, blocked.text)
+        body = blocked.json()
+        self.assertTrue(body.get("need_payment"))
+        self.assertEqual(body.get("amount_sats"), 1000)
+        self.assertEqual(body.get("amount_usd"), "$0.80")
+        paid = self.client.post("/api/search", data={**payload, "unlock": "1"})
+        self.assertEqual(paid.status_code, 200, paid.text)
+        db = SessionLocal()
+        try:
+            row = db.query(Inquiry).filter(Inquiry.email == "paywall@gmail.com").one()
+            self.assertGreaterEqual(row.search_count, 6)
+            self.assertGreaterEqual(row.paid_credits, 1)
+        finally:
+            db.close()
+
     def test_wrong_admin_pin(self):
         r = self.client.post("/api/admin/unlock", json={"pin": "definitely-wrong-pin-xx"})
         self.assertEqual(r.status_code, 403)
+
+    def test_admin_login_page_exists(self):
+        r = self.client.get("/admin")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Management login", r.text)
+        self.assertIn("/api/admin/login", r.text)
+
+    def test_admin_login_requires_admin_email(self):
+        from app.config import settings
+
+        blocked = self.client.post(
+            "/api/admin/login",
+            json={"email": "someone.else@gmail.com", "password": settings.admin_pin},
+        )
+        self.assertEqual(blocked.status_code, 403)
+        ok = self.client.post(
+            "/api/admin/login",
+            json={"email": "lucianamitchell19@gmail.com", "password": settings.admin_pin},
+        )
+        self.assertEqual(ok.status_code, 200, ok.text)
+        self.assertTrue(ok.json().get("ok"))
+        leads = self.client.get("/api/leads", headers={"X-Admin-Pin": settings.admin_pin})
+        self.assertEqual(leads.status_code, 200)
+        self.assertIsInstance(leads.json(), list)
 
 
 if __name__ == "__main__":
