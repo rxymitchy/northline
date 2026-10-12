@@ -12,6 +12,8 @@ def database_url() -> str:
     url = (settings.database_url or "").strip() or "sqlite:///./data/prospects.db"
     if url.startswith("postgres://"):
         url = "postgresql://" + url[len("postgres://") :]
+    if url.startswith("postgresql") and "sslmode=" not in url:
+        url += ("&" if "?" in url else "?") + "sslmode=require"
     return url
 
 
