@@ -2,6 +2,7 @@
 
 Usage (from the backend folder):
     py -3.13 scripts/copy_db.py "<FROM_DATABASE_URL>" "<TO_DATABASE_URL>"
+    py -3.13 scripts/copy_db.py "<FROM_DATABASE_URL>" vercel     (target read from .env.vercel)
 
 The target tables are created if missing. The script refuses to run if the target already
 has rows, so it can never overwrite live data. The source is only read, never changed.
@@ -15,8 +16,24 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy import create_engine, func, select, text  # noqa: E402
 
 
+def _vercel_url() -> str:
+    """Read the Neon URL pulled by `vercel env pull .env.vercel` (direct connection preferred)."""
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env.vercel")
+    found = {}
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            key, _, val = line.strip().partition("=")
+            found[key] = val.strip().strip('"')
+    url = found.get("DATABASE_URL_UNPOOLED") or found.get("DATABASE_URL") or ""
+    if not url:
+        raise SystemExit("No DATABASE_URL in .env.vercel. Run: vercel env pull .env.vercel --environment production")
+    return url
+
+
 def _url(raw: str) -> str:
     url = raw.strip()
+    if url.lower() == "vercel":
+        url = _vercel_url()
     if url.startswith("postgres://"):
         url = "postgresql://" + url[len("postgres://") :]
     if url.startswith("postgresql") and "sslmode=" not in url:
