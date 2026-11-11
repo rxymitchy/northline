@@ -88,7 +88,7 @@ Never commit your `.env` file.
 From `backend/`:
 
 ```bash
-python -m unittest discover -s tests
+python -m unittest discover
 ```
 
 ## Deployment

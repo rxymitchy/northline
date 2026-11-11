@@ -39,7 +39,6 @@ class Settings(BaseSettings):
     # Admin access stays off until both are set in the environment.
     admin_pin: str = ""
     admin_email: str = ""
-    booking_url: str = ""
     contact_email: str = ""
     lightning_address: str = ""
     # Serverless hosts (Vercel) freeze the process once a response is sent, so background
