@@ -33,7 +33,7 @@ def build_brief(
     html = _html_doc(name, site, industry, observed, facts, gaps, offer, similar, right, channel or {}, diagnosis)
     text = _text_doc(name, site, industry, observed, facts, gaps, offer, similar, right, channel or {}, diagnosis)
     return {
-        "title": f"{name} — Northline operations snapshot",
+        "title": f"{name}: Northline operations snapshot",
         "industry": industry,
         "html": html,
         "text": text,
@@ -77,12 +77,12 @@ def _process_table(processes: list) -> str:
             f"<td>{escape(p.get('process') or '')}</td>"
             f"<td>{escape(p.get('human_work') or '')}</td>"
             f"<td>{escape(p.get('priority') or '')}</td>"
-            f"<td>{escape(p.get('why') or '')}</td>"
+            f"<td>{escape(p.get('fix') or p.get('why') or '')}</td>"
             "</tr>"
         )
     return (
         "<table class='ops'><thead><tr>"
-        "<th>Process</th><th>Current human work</th><th>Priority</th><th>Why it matters</th>"
+        "<th>Area</th><th>What happens now</th><th>Priority</th><th>What to do</th>"
         "</tr></thead><tbody>"
         + "".join(rows)
         + "</tbody></table>"
@@ -100,7 +100,7 @@ def _html_doc(name, site, industry, observed, facts, gaps, offer, similar, right
     automate = diagnosis.get("automate_first") or {}
     site_line = " · ".join(x for x in (site, industry) if x)
     return f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>{escape(name)} — {BRAND}</title>
+<html><head><meta charset="utf-8"><title>{escape(name)}: {BRAND}</title>
 <style>
   body {{ font-family: Georgia, 'Times New Roman', serif; color: #1a1a1a; max-width: 680px; margin: 0 auto; padding: 32px 20px; line-height: 1.5; }}
   h1 {{ font-size: 26px; font-weight: 600; margin: 0 0 6px; }}
@@ -122,18 +122,27 @@ def _html_doc(name, site, industry, observed, facts, gaps, offer, similar, right
   <p class="sub">{escape(site_line + (" · " if site_line else "") + "operations snapshot from " + BRAND)}</p>
   <p class="sub">See what's still manual</p>
   <h2>Business operations snapshot</h2>
-  <p>Overall manual dependency: <span class="sev">{escape(str(overall).upper())}</span></p>
+  <p>Manual work score: <span class="sev">{escape(str(overall).upper())}</span></p>
   <p>{escape(str(observed))}</p>
   {_process_table(diagnosis.get("processes") or [])}
-  <h2>What to automate first</h2>
-  <p><b>{escape(automate.get("title") or "The first handoff")}</b></p>
-  <p>{escape(automate.get("reason") or offer or "Northline did not see a single dominant public bottleneck.")}</p>
-  {_bullets(automate.get("evidence") or facts, "No public quotes were strong enough to list.")}
-  <h2>Suggested workflow</h2>
+  <h2>Start here</h2>
+  <p><b>{escape(automate.get("title") or "Start with how new enquiries reach you")}</b></p>
+  <p>{escape(automate.get("reason") or offer or "")}</p>
+  {_steps(automate.get("steps") or [])}
+  <h2>What we saw</h2>
+  {_bullets(automate.get("evidence") or facts, "Nothing stood out clearly enough to quote.")}
+  <h2>How it could work</h2>
   {_workflow_html(diagnosis.get("workflow") or [])}
   {_channel_html(channel)}
   <p class="foot">{escape(diagnosis.get("caveat") or "Public pages and what you submitted only. We do not invent emails or internal problems.")}</p>
 </body></html>"""
+
+
+def _steps(items: list) -> str:
+    items = [str(i) for i in items if i]
+    if not items:
+        return ""
+    return "<ol>" + "".join(f"<li>{escape(i)}</li>" for i in items) + "</ol>"
 
 
 def _channel_html(channel: dict) -> str:
@@ -146,7 +155,7 @@ def _channel_html(channel: dict) -> str:
         parts.append("<h2>What’s missing</h2>")
         parts.append(_bullets([str(m) for m in channel["missing"]], ""))
     if channel.get("explore"):
-        parts.append("<h2>Extra suggestions</h2>")
+        parts.append("<h2>Other ideas</h2>")
         parts.append(_bullets([str(m) for m in channel["explore"]], ""))
     return "\n".join(parts)
 
@@ -162,29 +171,30 @@ def _text_doc(name, site, industry, observed, facts, gaps, offer, similar, right
         "See what's still manual",
         "",
         "BUSINESS OPERATIONS SNAPSHOT",
-        f"Overall manual dependency: {str(overall).upper()}",
+        f"Manual work score: {str(overall).upper()}",
         observed,
         "",
     ]
     if processes:
-        bits.append("Process / current human work / priority / why it matters")
+        bits.append("Area / what happens now / priority / what to do")
         for p in processes:
-            bits.append(f"- {p.get('process')}: {p.get('human_work')} [{p.get('priority')}] {p.get('why')}")
+            bits.append(f"* {p.get('process')}: {p.get('human_work')} [{p.get('priority')}] {p.get('fix') or p.get('why')}")
         bits.append("")
     bits += [
-        "WHAT TO AUTOMATE FIRST",
+        "START HERE",
         automate.get("title") or "",
         automate.get("reason") or offer or "",
+        *[f"{i}. {s}" for i, s in enumerate(automate.get("steps") or [], 1)],
         "",
-        "SUGGESTED WORKFLOW",
-        " → ".join(workflow) if workflow else "Incoming enquiry → capture → follow-up → human handoff when needed",
+        "HOW IT COULD WORK",
+        " → ".join(workflow) if workflow else "New enquiry → instant reply → saved in one list → reminder → a person steps in when needed",
         "",
     ]
     if channel and channel.get("state"):
         bits += ["NOTES ON WHAT YOU SENT", channel.get("state"), ""]
     bits += [
         diagnosis.get("caveat") or "",
-        f"— {BRAND}",
+        f"{BRAND}",
         "",
     ]
     return "\n".join(bits)

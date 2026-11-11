@@ -54,9 +54,13 @@ class DiagnosisTests(unittest.TestCase):
         }
         dx = build_diagnosis("website", research, gap, {})
         self.assertEqual(dx["overall"], "HIGH")
-        self.assertTrue(any(p["process"] == "Lead capture" for p in dx["processes"]))
-        self.assertIn("capture", dx["workflow"])
-        self.assertIn("Based on the information provided", dx["summary"])
+        self.assertTrue(any(p["process"] == "Replying to new enquiries" for p in dx["processes"]))
+        self.assertIn("Instant reply", dx["workflow"])
+        self.assertIn("The biggest one", dx["summary"])
+        top = dx["processes"][0]
+        self.assertIn("WhatsApp", top["proof"])
+        self.assertTrue(top["fix"])
+        self.assertEqual(len(dx["automate_first"]["steps"]), 3)
         self.assertNotIn("TODO", dx["automate_first"]["reason"])
 
     def test_describe_csv_record_keeping(self):
@@ -64,12 +68,42 @@ class DiagnosisTests(unittest.TestCase):
         gap = {"exists": True, "facts": [], "gaps": []}
         dx = build_diagnosis("csv", research, gap, {})
         names = [p["process"] for p in dx["processes"]]
-        self.assertIn("Record keeping", names)
+        self.assertIn("Keeping records", names)
 
     def test_low_when_nothing_visible(self):
         dx = build_diagnosis("website", {"text": "Hello", "signals": {}}, {"exists": False, "facts": [], "gaps": []}, {})
         self.assertEqual(dx["overall"], "LOW")
-        self.assertIn("limited public evidence", dx["summary"])
+        self.assertIn("did not find clear signs", dx["summary"])
+
+
+class PlainWordsTests(unittest.TestCase):
+    def test_advice_has_no_dashes(self):
+        import json
+        import re
+
+        from app.modules.channel_notes import channel_notes
+        from app.plain import plain_all
+
+        text = (
+            "Call us to book. Chat on WhatsApp: wa.me/254700000000. Send us a message via our contact form "
+            "and our team will get back to you. Request a quote. Apply now. DM us. We keep leads in Excel."
+        )
+        signals = {
+            "whatsapp_channel": True, "call_to_book": True, "enquiry_form": True, "manual_followup_language": True,
+            "quote_request": True, "application_process": True, "dm_cta": True,
+        }
+        for source in ("website", "social", "csv", "describe"):
+            research = {"text": text, "signals": signals}
+            gap = {"exists": True, "facts": [], "gaps": []}
+            notes = plain_all(channel_notes(source, "https://instagram.com/x", research, gap))
+            dx = build_diagnosis(source, research, gap, notes)
+            blob = json.dumps([dx, notes], ensure_ascii=False)
+            self.assertFalse(re.search(r"[—–]| - ", blob), f"dash in {source}: {blob}")
+
+    def test_plain_rewrites_dashes_and_jargon(self):
+        from app.plain import plain
+
+        self.assertEqual(plain("Fast — and self-serve follow-up"), "Fast, and self service follow up")
 
 
 class BriefTests(unittest.TestCase):
@@ -94,7 +128,7 @@ class BriefTests(unittest.TestCase):
         self.assertNotIn("your space", brief["html"].lower())
         self.assertIn("BUSINESS OPERATIONS SNAPSHOT", brief["text"])
         self.assertIn("Alex", brief["html"])
-        self.assertIn("Overall manual dependency", brief["html"])
+        self.assertIn("Manual work score", brief["html"])
         from app.report_pdf import build_brief_pdf
 
         pdf = build_brief_pdf(brief, "Alex", "")
@@ -237,7 +271,7 @@ class VisitorResearchTests(unittest.TestCase):
             {"exists": True, "facts": [], "gaps": []},
             {},
         )
-        self.assertIn("Public web mentions", dx["summary"])
+        self.assertIn("1 other place that mentions you", dx["summary"])
 
 
 class DatabaseUrlTests(unittest.TestCase):

@@ -111,19 +111,21 @@ class ReportPDF(FPDF):
         self.ln(0.6)
         self.set_text_color(*INK)
 
-    def bullets(self, items: list):
+    def bullets(self, items: list, numbered: bool = False):
         self.set_font("Helvetica", "", 10)
         self.set_text_color(*INK)
+        n = 0
         for item in items:
             line = _t(item)
             if not line:
                 continue
             self.need(12)
             y = self.get_y()
+            n += 1
             self.set_xy(self.l_margin, y)
-            self.cell(5, 5.5, "-")
-            self.set_xy(self.l_margin + 5, y)
-            self.multi_cell(self.epw - 5, 5.5, line)
+            self.cell(6, 5.5, f"{n}." if numbered else chr(149))
+            self.set_xy(self.l_margin + 6, y)
+            self.multi_cell(self.epw - 6, 5.5, line)
 
     def _wrap_height(self, text: str, width: float, line_h: float = 4.2) -> float:
         lines = self.multi_cell(width, line_h, text or " ", dry_run=True, output="LINES")
@@ -143,7 +145,7 @@ def build_brief_pdf(brief: dict, name: str, site: str = "") -> bytes:
         diagnosis.get("summary")
         or "Northline reviewed what you sent and noted how work appears to move."
     )
-    site_line = " - ".join(x for x in (_t(site), industry) if x)
+    site_line = " | ".join(x for x in (_t(site), industry) if x)
 
     pdf = ReportPDF()
     pdf.add_page()
@@ -154,7 +156,7 @@ def build_brief_pdf(brief: dict, name: str, site: str = "") -> bytes:
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(*MUTE)
     pdf.set_x(pdf.l_margin)
-    pdf.multi_cell(0, 5, _t((site_line + " - " if site_line else "") + "operations snapshot"))
+    pdf.multi_cell(0, 5, _t((site_line + " | " if site_line else "") + "operations snapshot"))
     pdf.ln(2)
 
     pdf.set_fill_color(*PAPER)
@@ -165,7 +167,7 @@ def build_brief_pdf(brief: dict, name: str, site: str = "") -> bytes:
     pdf.set_xy(pdf.l_margin + 4, y_badge + 2)
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(*MUTE)
-    pdf.cell(58, 6, "Overall manual dependency")
+    pdf.cell(70, 6, "Manual work score")
     pdf.set_font("Helvetica", "B", 11)
     pdf.set_text_color(*_prio_color(overall))
     pdf.cell(0, 6, overall)
@@ -178,7 +180,7 @@ def build_brief_pdf(brief: dict, name: str, site: str = "") -> bytes:
     if processes:
         pdf.ln(1)
         col_w = [36, 50, 22, pdf.epw - 108]
-        headers = ["Process", "Current human work", "Priority", "Why it matters"]
+        headers = ["Area", "What happens now", "Priority", "What to do"]
         pdf.need(16)
         pdf.set_fill_color(*PAPER)
         pdf.set_font("Helvetica", "B", 8)
@@ -192,7 +194,7 @@ def build_brief_pdf(brief: dict, name: str, site: str = "") -> bytes:
                 _t(row.get("process")),
                 _t(row.get("human_work")),
                 _t(row.get("priority")),
-                _t(row.get("why")),
+                _t(row.get("fix") or row.get("why")),
             ]
             pdf.set_font("Helvetica", "", 8)
             h = max(pdf._wrap_height(cells[i], col_w[i]) for i in range(4))
@@ -217,7 +219,7 @@ def build_brief_pdf(brief: dict, name: str, site: str = "") -> bytes:
             pdf.set_draw_color(*LINE)
             pdf.line(pdf.l_margin, pdf.get_y(), pdf.l_margin + pdf.epw, pdf.get_y())
 
-    pdf.section("What to automate first")
+    pdf.section("Start here")
     pdf.body(_t(automate.get("title") or "The first handoff"), bold=True, size=12)
     pdf.body(
         _t(
@@ -225,12 +227,18 @@ def build_brief_pdf(brief: dict, name: str, site: str = "") -> bytes:
             or "Northline did not see a single dominant public bottleneck."
         )
     )
+    steps_first = [s for s in (automate.get("steps") or []) if s]
+    if steps_first:
+        pdf.ln(1)
+        pdf.bullets(steps_first, numbered=True)
     if evidence:
+        pdf.ln(1)
+        pdf.muted("What we saw")
         pdf.bullets(evidence)
 
-    pdf.section("Suggested workflow")
+    pdf.section("How it could work")
     steps = [_t(s) for s in workflow if s]
-    pdf.body("  ->  ".join(steps) if steps else "Incoming enquiry -> capture -> follow-up -> human handoff when needed")
+    pdf.body("  ->  ".join(steps) if steps else "New enquiry -> instant reply -> saved in one list -> reminder -> a person steps in when needed")
 
     if channel and (channel.get("state") or channel.get("missing") or channel.get("explore")):
         pdf.section("Notes on what you sent")
@@ -240,7 +248,7 @@ def build_brief_pdf(brief: dict, name: str, site: str = "") -> bytes:
             pdf.muted("What's missing")
             pdf.bullets(channel.get("missing") or [])
         if channel.get("explore"):
-            pdf.muted("Could be worth exploring")
+            pdf.muted("Other ideas")
             pdf.bullets(channel.get("explore") or [])
 
     pdf.ln(4)

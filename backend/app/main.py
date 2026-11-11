@@ -9,7 +9,8 @@ from app.config import settings
 from app.db import engine, init_db
 from app.emailer import sending_outbound_allowed, smtp_ready
 
-Path("data").mkdir(exist_ok=True)
+if engine.dialect.name == "sqlite":
+    Path("data").mkdir(exist_ok=True)  # local dev only; serverless disks are read-only
 init_db()
 
 app = FastAPI(title="Northline", version="0.2.0")
