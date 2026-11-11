@@ -202,14 +202,17 @@ class ApiGuardTests(unittest.TestCase):
             db.close()
 
     def test_sixth_search_requires_lightning_payment(self):
+        """From the 6th diagnosis the server only proceeds once Blink confirms the invoice is paid."""
+        import uuid
         from unittest.mock import patch
 
         from app.db import SessionLocal
         from app.models import Inquiry
 
+        email = f"paywall-{uuid.uuid4().hex[:8]}@gmail.com"
         payload = {
             "name": "Alex",
-            "email": "paywall@gmail.com",
+            "email": email,
             "source": "describe",
             "description": "Leads come on WhatsApp. Someone copies them into Excel by hand every day.",
         }
@@ -222,7 +225,7 @@ class ApiGuardTests(unittest.TestCase):
             time.sleep(0.25)
         db = SessionLocal()
         try:
-            row = db.query(Inquiry).filter(Inquiry.email == "paywall@gmail.com").one()
+            row = db.query(Inquiry).filter(Inquiry.email == email).one()
             row.search_count = 5
             db.commit()
         finally:
@@ -232,6 +235,7 @@ class ApiGuardTests(unittest.TestCase):
             "amount_sats": 1000,
             "amount_usd": "$0.80",
             "invoice": "lnbc10u1p" + ("q" * 40),
+            "verify_url": "https://lnurl.blink.sv/verify/abc",
             "qr_png": "data:image/png;base64,aaaa",
             "wallet_uri": "lightning:lnbc",
         }
@@ -242,15 +246,118 @@ class ApiGuardTests(unittest.TestCase):
         self.assertTrue(body.get("need_payment"))
         self.assertEqual(body.get("amount_sats"), 1000)
         self.assertEqual(body.get("amount_usd"), "$0.80")
-        paid = self.client.post("/api/search", data={**payload, "unlock": "1"})
+        token = body.get("payment")
+        self.assertTrue(token)
+        self.assertNotIn("verify", blocked.text)  # the verify link never reaches the browser
+
+        # The old "I've paid" flag alone no longer unlocks anything.
+        with patch("app.api.create_tip_invoice", return_value=fake):
+            bluff = self.client.post("/api/search", data={**payload, "unlock": "1"})
+        self.assertEqual(bluff.status_code, 402, bluff.text)
+
+        # Not paid yet: same token is kept, no diagnosis starts.
+        with patch("app.api.invoice_paid", return_value=False):
+            waiting = self.client.post("/api/search", data={**payload, "payment": token})
+        self.assertEqual(waiting.status_code, 402, waiting.text)
+        self.assertTrue(waiting.json().get("pending"))
+
+        # Someone else's email cannot use this payment.
+        other = {**payload, "email": f"other-{uuid.uuid4().hex[:8]}@gmail.com"}
+        with patch("app.api.invoice_paid", return_value=True):
+            stolen = self.client.post("/api/search", data={**other, "payment": token})
+        self.assertEqual(stolen.status_code, 200, stolen.text)  # free first run for the new email
+        self.assertTrue(stolen.json().get("id"))
+
+        # Paid: one diagnosis unlocks, and it is recorded as a paid credit.
+        with patch("app.api.invoice_paid", return_value=True):
+            paid = self.client.post("/api/search", data={**payload, "payment": token})
         self.assertEqual(paid.status_code, 200, paid.text)
+        for _ in range(80):
+            st = self.client.get(f"/api/runs/{paid.json()['id']}").json()
+            if st.get("status") in ("completed", "failed"):
+                break
+            time.sleep(0.25)
         db = SessionLocal()
         try:
-            row = db.query(Inquiry).filter(Inquiry.email == "paywall@gmail.com").one()
-            self.assertGreaterEqual(row.search_count, 6)
-            self.assertGreaterEqual(row.paid_credits, 1)
+            row = db.query(Inquiry).filter(Inquiry.email == email).one()
+            self.assertEqual(row.search_count, 6)
+            self.assertEqual(row.paid_credits, 1)
         finally:
             db.close()
+
+        # The same payment cannot be used twice: a fresh invoice is shown instead.
+        with patch("app.api.invoice_paid", return_value=True), patch("app.api.create_tip_invoice", return_value=fake):
+            reuse = self.client.post("/api/search", data={**payload, "payment": token})
+        self.assertEqual(reuse.status_code, 402, reuse.text)
+        self.assertNotEqual(reuse.json().get("payment"), token)
+
+        # If Blink cannot be reached, nothing is given away.
+        with patch("app.api.create_tip_invoice", return_value=fake):
+            fresh = self.client.post("/api/search", data=payload).json()["payment"]
+        with patch("app.api.invoice_paid", side_effect=RuntimeError("network")):
+            down = self.client.post("/api/search", data={**payload, "payment": fresh})
+        self.assertEqual(down.status_code, 502, down.text)
+
+    def test_paywall_refuses_invoice_without_verify_link(self):
+        import uuid
+        from unittest.mock import patch
+
+        from app.db import SessionLocal
+        from app.models import Inquiry
+
+        email = f"noverify-{uuid.uuid4().hex[:8]}@gmail.com"
+        db = SessionLocal()
+        try:
+            db.add(Inquiry(name="N", email=email, source_kind="describe", source_value="", search_count=5))
+            db.commit()
+        finally:
+            db.close()
+        fake = {"invoice": "lnbc10u1p" + ("q" * 40), "verify_url": "", "qr_png": "", "amount_sats": 1000}
+        with patch("app.api.create_tip_invoice", return_value=fake):
+            r = self.client.post(
+                "/api/search",
+                data={"name": "Nina", "email": email, "source": "describe", "description": "x" * 40},
+            )
+        self.assertEqual(r.status_code, 502, r.text)
+
+    def test_payment_check_never_skips_certificate_verification(self):
+        from unittest.mock import patch
+
+        import httpx
+
+        from app import tip
+
+        calls = []
+
+        class FakeClient:
+            def __init__(self, verify=True, **kw):
+                calls.append(verify)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def get(self, url, headers=None):
+                raise httpx.ConnectError("cert failed")
+
+        with patch.object(tip.httpx, "Client", FakeClient):
+            with self.assertRaises(httpx.ConnectError):
+                tip.invoice_paid("https://lnurl.blink.sv/verify/abc")
+        self.assertEqual(calls, [True])  # tried once, securely, and did not retry insecurely
+        self.assertFalse(tip.invoice_paid("https://evil.example/verify/abc"))  # wrong host
+
+    def test_no_insecure_fallback_on_hosted_servers(self):
+        import os
+        from unittest.mock import patch
+
+        from app import tip
+
+        with patch.dict(os.environ, {"VERCEL": "1"}):
+            self.assertFalse(tip._insecure_fallback_ok())
+        with patch.dict(os.environ, {"RENDER": "true"}):
+            self.assertFalse(tip._insecure_fallback_ok())
 
     def test_wrong_admin_pin(self):
         r = self.client.post("/api/admin/unlock", json={"pin": "definitely-wrong-pin-xx"})
