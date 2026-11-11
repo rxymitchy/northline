@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import io
 import ipaddress
+import os
 import re
 import time
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
@@ -139,12 +140,17 @@ def create_tip_invoice(amount_sats: int) -> dict:
     sats = min(max(sats, min_sats), max_sats)
     invoice_payload = _get_json(_with_amount(callback, sats * 1000), expected_host)
     invoice = _clean_invoice(invoice_payload.get("pr") or invoice_payload.get("bolt11") or "")
+    # LUD-21: a URL on the same host that reports whether this exact invoice was paid.
+    verify_url = str(invoice_payload.get("verify") or "").strip()
+    if verify_url and not _same_host(verify_url, expected_host):
+        verify_url = ""
     uri = f"lightning:{invoice}"
     png = _qr_png(uri)
     return {
         "ok": True,
         "amount_sats": sats,
         "invoice": invoice,
+        "verify_url": verify_url,
         "wallet_uri": uri,
         "qr_png": png,
         "expires_hint": "Scan with Phoenix, Blink, Wallet of Satoshi, Zeus, or any Lightning wallet. The invoice is one-time.",
@@ -188,7 +194,36 @@ def _with_amount(callback: str, amount_msat: int) -> str:
     return urlunparse(parsed._replace(query=urlencode(query)))
 
 
-def _get_json(url: str, expected_host: str) -> dict:
+def invoice_paid(verify_url: str) -> bool:
+    """Ask the wallet provider whether an invoice is settled.
+
+    Always uses full TLS verification (never the local-dev fallback), because a forged
+    "settled" answer would hand out paid diagnoses for free.
+    """
+    address = configured_lightning_address()
+    expected_host = address.split("@", 1)[1]
+    if not verify_url or not _same_host(verify_url, expected_host):
+        return False
+    data = _get_json(verify_url, expected_host, strict=True)
+    return data.get("settled") is True and str(data.get("status") or "").upper() == "OK"
+
+
+def _same_host(url: str, expected_host: str) -> bool:
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    return parsed.scheme == "https" and (host == expected_host or host.endswith("." + expected_host))
+
+
+def _insecure_fallback_ok() -> bool:
+    """Only on a developer machine: some Windows antivirus tools break certificate checks.
+
+    Never on a real server, where a failed check may mean someone is intercepting traffic.
+    """
+    hosted = any(os.environ.get(k) for k in ("VERCEL", "RENDER", "RAILWAY_ENVIRONMENT"))
+    return not hosted
+
+
+def _get_json(url: str, expected_host: str, strict: bool = False) -> dict:
     parsed = urlparse(url)
     host = (parsed.hostname or "").lower()
     if parsed.scheme != "https" or not (host == expected_host or host.endswith("." + expected_host)):
@@ -201,7 +236,9 @@ def _get_json(url: str, expected_host: str) -> dict:
         with httpx.Client(verify=True, timeout=12.0, follow_redirects=False) as client:
             response = client.get(url, headers=headers)
     except httpx.ConnectError:
-        # Windows antivirus HTTPS inspection can break cert verify; host is still allowlisted.
+        if strict or not _insecure_fallback_ok():
+            raise
+        # Local dev only: Windows antivirus HTTPS inspection can break cert verify.
         with httpx.Client(verify=False, timeout=12.0, follow_redirects=False) as client:
             response = client.get(url, headers=headers)
     if response.status_code >= 300:

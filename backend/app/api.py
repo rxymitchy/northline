@@ -2,6 +2,7 @@ import hmac
 import json
 import os
 import re
+import secrets
 from datetime import datetime, timedelta, timezone
 from threading import Thread
 from urllib.parse import urlparse
@@ -15,12 +16,12 @@ from app.config import settings
 from app.emailer import email_reject_reason, smtp_ready
 from app.db import get_db
 from app.export_csv import export_run_csv
-from app.models import Company, Contact, EventLog, Inquiry, Opportunity, Outreach, ResearchRun
+from app.models import Company, Contact, EventLog, Inquiry, Opportunity, Outreach, Payment, ResearchRun
 from app.pipeline import run_pipeline
 from app.playbook import DEFAULT_ICP
 from app.report_pdf import build_brief_pdf
 from app.self_analysis import compose_brief, email_report, run_search
-from app.tip import create_tip_invoice, tip_menu, tip_rate_ok, usd_label
+from app.tip import create_tip_invoice, invoice_paid, tip_menu, tip_rate_ok, usd_label
 
 FREE_DIAGNOSES = 5
 EXTRA_DIAGNOSIS_SATS = 1000
@@ -139,7 +140,7 @@ async def create_search(
     url: str = Form(""),
     description: str = Form(""),
     file: UploadFile | None = File(None),
-    unlock: str = Form(""),
+    payment: str = Form(""),
 ):
     name = (name or "").strip()
     email = (email or "").strip().lower()
@@ -194,25 +195,28 @@ async def create_search(
                     "start": inline_runs() and live.status == "queued",
                 }
     used = int(inquiry.search_count or 0) if inquiry else 0
-    if used >= FREE_DIAGNOSES and (unlock or "").strip() != "1":
-        try:
-            invoice = create_tip_invoice(EXTRA_DIAGNOSIS_SATS)
-        except Exception:
-            raise HTTPException(502, "Could not start the Lightning payment. Try again in a moment.") from None
-        usd = invoice.get("amount_usd") or usd_label(EXTRA_DIAGNOSIS_SATS)
-        return JSONResponse(
-            status_code=402,
-            content={
-                "need_payment": True,
-                "search_count": used,
-                "next_number": used + 1,
-                "amount_sats": EXTRA_DIAGNOSIS_SATS,
-                "amount_usd": usd,
-                "qr_png": invoice.get("qr_png") or "",
-                "invoice": invoice.get("invoice") or "",
-                "message": "Your first 5 snapshots are included. From the 6th, each one is 1,000 sats.",
-            },
-        )
+    paid_now = False
+    if used >= FREE_DIAGNOSES:
+        token = (payment or "").strip()
+        if token:
+            outcome = _redeem_payment(db, email, token)
+            if outcome == "ok":
+                paid_now = True
+            elif outcome == "unpaid":
+                return JSONResponse(
+                    status_code=402,
+                    content={
+                        "need_payment": True,
+                        "pending": True,
+                        "payment": token,
+                        "message": "We haven't received the payment yet. Once your wallet shows it as sent, wait a few seconds and tap the button again.",
+                    },
+                )
+            elif outcome == "error":
+                raise HTTPException(502, "We couldn't check the payment just now. Wait a moment and try again.")
+            # "invalid" (unknown or already used): fall through and show a fresh invoice.
+        if not paid_now:
+            return _paywall(db, email, used)
     run = ResearchRun(icp_text=json.dumps(payload), status="queued", kind="search")
     db.add(run)
     db.commit()
@@ -225,7 +229,7 @@ async def create_search(
         inquiry.source_kind = source
         inquiry.source_value = detail
         inquiry.search_count = int(inquiry.search_count or 1) + 1
-        if (unlock or "").strip() == "1":
+        if paid_now:
             inquiry.paid_credits = int(inquiry.paid_credits or 0) + 1
         inquiry.updated_at = now
     else:
@@ -246,6 +250,63 @@ async def create_search(
         return {"id": run.id, "status": run.status, "lead_saved": True, "start": True}
     Thread(target=run_search, args=(run.id,), daemon=True).start()
     return {"id": run.id, "status": run.status, "lead_saved": True}
+
+
+def _paywall(db: Session, email: str, used: int) -> JSONResponse:
+    """Create a Lightning invoice for one extra diagnosis and remember it for this email."""
+    try:
+        invoice = create_tip_invoice(EXTRA_DIAGNOSIS_SATS)
+    except Exception:
+        raise HTTPException(502, "Could not start the Lightning payment. Try again in a moment.") from None
+    if not invoice.get("verify_url"):
+        # Without a way to confirm payment we must not take money we cannot match to a diagnosis.
+        raise HTTPException(502, "Payments are unavailable right now. Try again later.")
+    token = secrets.token_urlsafe(24)
+    db.add(
+        Payment(
+            token=token,
+            email=email,
+            invoice=invoice.get("invoice") or "",
+            verify_url=invoice["verify_url"],
+            amount_sats=int(invoice.get("amount_sats") or EXTRA_DIAGNOSIS_SATS),
+        )
+    )
+    db.commit()
+    return JSONResponse(
+        status_code=402,
+        content={
+            "need_payment": True,
+            "payment": token,
+            "search_count": used,
+            "next_number": used + 1,
+            "amount_sats": EXTRA_DIAGNOSIS_SATS,
+            "amount_usd": invoice.get("amount_usd") or usd_label(EXTRA_DIAGNOSIS_SATS),
+            "qr_png": invoice.get("qr_png") or "",
+            "invoice": invoice.get("invoice") or "",
+            "message": "Your first 5 snapshots are included. From the 6th, each one is 1,000 sats.",
+        },
+    )
+
+
+def _redeem_payment(db: Session, email: str, token: str) -> str:
+    """Return "ok" (paid, now used), "unpaid", "invalid" (unknown/used/other email), or "error"."""
+    row = db.query(Payment).filter(Payment.token == token, Payment.email == email).first()
+    if not row or row.status != "pending":
+        return "invalid"
+    try:
+        paid = invoice_paid(row.verify_url)
+    except Exception:
+        return "error"
+    if not paid:
+        return "unpaid"
+    # Atomic claim: a settled invoice unlocks exactly one diagnosis, even with double clicks.
+    claimed = (
+        db.query(Payment)
+        .filter(Payment.id == row.id, Payment.status == "pending")
+        .update({"status": "used", "used_at": datetime.now(timezone.utc)}, synchronize_session=False)
+    )
+    db.commit()
+    return "ok" if claimed else "invalid"
 
 
 @router.post("/runs/{run_id}/start")
