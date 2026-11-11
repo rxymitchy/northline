@@ -407,6 +407,38 @@ class ApiGuardTests(unittest.TestCase):
         self.assertEqual(leads.status_code, 200)
         self.assertIsInstance(leads.json(), list)
 
+    def test_company_leads_admin_only(self):
+        self.assertEqual(self.client.get("/api/company-leads").status_code, 403)
+        r = self.client.get("/api/company-leads", headers={"X-Admin-Pin": "definitely-wrong-pin-xx"})
+        self.assertEqual(r.status_code, 403)
+
+    @patch("app.config.settings.admin_pin", "test-pin-1234567890")
+    def test_company_leads_use_search_email(self):
+        email = "company.lead@gmail.com"
+        r = self.client.post(
+            "/api/search",
+            data={
+                "name": "Jane Bakery",
+                "email": email,
+                "source": "describe",
+                "description": "Orders come on WhatsApp and someone types them into a notebook every morning.",
+            },
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+        run_id = r.json()["id"]
+        if r.json().get("start"):
+            self.client.post(f"/api/runs/{run_id}/start")
+        for _ in range(80):
+            if self.client.get(f"/api/runs/{run_id}").json().get("status") in ("completed", "failed"):
+                break
+            time.sleep(0.25)
+        rows = self.client.get("/api/company-leads", headers={"X-Admin-Pin": "test-pin-1234567890"}).json()
+        mine = [row for row in rows if row["email"] == email]
+        self.assertEqual(len(mine), 1, rows)
+        self.assertEqual(mine[0]["contact_name"], "Jane Bakery")
+        self.assertEqual(mine[0]["run_id"], run_id)
+        self.assertIn("WhatsApp", mine[0]["note"])
+
 
 if __name__ == "__main__":
     unittest.main()

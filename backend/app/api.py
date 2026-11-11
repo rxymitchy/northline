@@ -397,6 +397,66 @@ def list_leads(db: Session = Depends(get_db), x_admin_pin: str | None = Header(d
     ]
 
 
+@router.get("/company-leads")
+def list_company_leads(db: Session = Depends(get_db), x_admin_pin: str | None = Header(default=None)):
+    """Companies visitors ran a diagnosis on, with the email they searched with as the contact."""
+    if not _admin_ok(x_admin_pin):
+        raise HTTPException(403, "Admin only")
+    rows = (
+        db.query(Company, ResearchRun)
+        .join(ResearchRun, Company.run_id == ResearchRun.id)
+        .filter(ResearchRun.kind == "search")
+        .order_by(Company.id.desc())
+        .limit(1000)
+        .all()
+    )
+    leads = []
+    seen = set()
+    for company, run in rows:
+        sub = _json(run.icp_text)
+        sub = sub if isinstance(sub, dict) else {}
+        email = str(sub.get("email") or "").strip().lower()
+        if not email:
+            continue
+        source = sub.get("source") or company.source or ""
+        # Only show what the visitor gave us. For descriptions and files the research step
+        # may pick up unrelated sites from a web search, so those details are left out.
+        own_page = source in ("website", "social")
+        url = str(sub.get("url") or "").strip() if own_page else ""
+        place = urlparse(url).netloc.lower().removeprefix("www.") if url else ""
+        # One row per company per email: the newest diagnosis wins.
+        key = (email, place or (company.name or "").strip().lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        fi = _json(company.fact_inference)
+        fi = fi if isinstance(fi, dict) else {}
+        diagnosis = fi.get("diagnosis") if isinstance(fi.get("diagnosis"), dict) else {}
+        first = diagnosis.get("automate_first") if isinstance(diagnosis.get("automate_first"), dict) else {}
+        leads.append(
+            {
+                "run_id": run.id,
+                "status": run.status,
+                "contact_name": sub.get("name") or company.name,
+                "email": email,
+                "company": place,
+                "website": url,
+                "source": source,
+                "industry": company.industry or "",
+                "phone": (company.phone or "") if own_page else "",
+                "whatsapp": (company.whatsapp or "") if own_page else "",
+                "public_email": (company.general_email or "") if own_page else "",
+                "note": (sub.get("description") or "")[:240],
+                "manual": (company.observed_problem or "")[:400],
+                "first_step": first.get("title") or "",
+                "when": format_eat(company.discovered_at),
+            }
+        )
+        if len(leads) >= 200:
+            break
+    return leads
+
+
 @router.post("/runs/{run_id}/email")
 def send_report(run_id: int, db: Session = Depends(get_db)):
     run = db.get(ResearchRun, run_id)
