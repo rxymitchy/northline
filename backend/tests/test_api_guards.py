@@ -1,5 +1,6 @@
 import time
 import unittest
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -116,7 +117,7 @@ class ApiGuardTests(unittest.TestCase):
             "/api/search",
             data={
                 "name": "Alex",
-                "email": "alex@gmail.com",
+                "email": "describe.flow@gmail.com",
                 "source": "describe",
                 "description": "Leads come on WhatsApp. Someone copies them into Excel. Follow-up is typed by hand.",
             },
@@ -153,7 +154,7 @@ class ApiGuardTests(unittest.TestCase):
             "/api/search",
             data={
                 "name": "Alex",
-                "email": "alex@gmail.com",
+                "email": "csv.flow@gmail.com",
                 "source": "csv",
                 "description": "This is our lead list exported from WhatsApp follow-up.",
             },
@@ -176,7 +177,7 @@ class ApiGuardTests(unittest.TestCase):
 
         payload = {
             "name": "Alex",
-            "email": "Alex@Gmail.com",
+            "email": "Repeat.Case@Gmail.com",
             "source": "describe",
             "description": "Leads come on WhatsApp. Someone copies them into Excel by hand every day.",
         }
@@ -189,12 +190,12 @@ class ApiGuardTests(unittest.TestCase):
             time.sleep(0.25)
         second = self.client.post(
             "/api/search",
-            data={**payload, "name": "Alexandra", "email": "alex@gmail.com"},
+            data={**payload, "name": "Alexandra", "email": "repeat.case@gmail.com"},
         )
         self.assertEqual(second.status_code, 200, second.text)
         db = SessionLocal()
         try:
-            rows = db.query(Inquiry).filter(Inquiry.email == "alex@gmail.com").all()
+            rows = db.query(Inquiry).filter(Inquiry.email == "repeat.case@gmail.com").all()
             self.assertEqual(len(rows), 1)
             self.assertGreaterEqual(rows[0].search_count, 2)
             self.assertEqual(rows[0].name, "Alexandra")
@@ -377,6 +378,17 @@ class ApiGuardTests(unittest.TestCase):
         self.assertIn("Management login", r.text)
         self.assertIn("/api/admin/login", r.text)
 
+    def test_admin_login_disabled_without_settings(self):
+        from app.config import settings
+
+        with patch.object(settings, "admin_pin", ""), patch.object(settings, "admin_email", ""):
+            r = self.client.post("/api/admin/login", json={"email": "", "password": ""})
+            self.assertEqual(r.status_code, 403)
+            r = self.client.get("/api/leads", headers={"X-Admin-Pin": ""})
+            self.assertEqual(r.status_code, 403)
+
+    @patch("app.config.settings.admin_email", "owner@example.com")
+    @patch("app.config.settings.admin_pin", "test-pin-1234567890")
     def test_admin_login_requires_admin_email(self):
         from app.config import settings
 
