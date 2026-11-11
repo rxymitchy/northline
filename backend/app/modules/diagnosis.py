@@ -124,7 +124,8 @@ PROOF_KEYS = {
     "application": ["application_process"],
 }
 EXTRA_PROOF = {
-    "followup": [r"follow[ -]?up", r"get back to you", r"we will call", r"by hand", r"manually"],
+    # Only phrases that are really about following up; "by hand" alone could be about anything.
+    "followup": [r"follow[ -]?up", r"get back to you", r"we will call", r"call (them|people|customers) back"],
     "sheet": [r"spreadsheet", r"excel", r"google sheets?", r"\bcsv\b"],
     "whatsapp": [r"whatsapp"],
     "social": [r"\bdms?\b", r"instagram", r"facebook", r"tiktok"],
@@ -227,6 +228,7 @@ def _proof(key: str, raw: str, own_words: bool, used: set[str] | None = None) ->
     for sig in PROOF_KEYS.get(key, []):
         patterns += SIGNAL_PATTERNS.get(sig, [])
     patterns += EXTRA_PROOF.get(key, [])
+    fallback = ""
     for pat in patterns:
         m = re.search(pat, raw, re.I)
         if not m:
@@ -237,9 +239,11 @@ def _proof(key: str, raw: str, own_words: bool, used: set[str] | None = None) ->
         lead = "You wrote" if own_words else "Your page says"
         quote = f'{lead}: "{snippet}"'
         if used and quote in used:
+            # Prefer a fresh sentence, but a correct repeat beats an unrelated quote.
+            fallback = fallback or quote
             continue
         return quote
-    return ""
+    return fallback
 
 
 # A sentence ends at . ! ? followed by space or end (so "wa.me" or "3.5" do not split), or a newline.
