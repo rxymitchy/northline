@@ -27,6 +27,7 @@
     a { color: #93c5fd; }
     .err { color: #fca5a5; }
     .hits { font-weight: 750; color: #86efac; }
+    .tag { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: #854d0e; color: #fef08a; font-size: 10px; font-weight: 800; letter-spacing: .04em; }
     .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
     .login-card { max-width: 420px; margin: 48px auto; background: #1e293b; padding: 28px; border-radius: 16px; }
     .hidden { display: none !important; }
@@ -58,7 +59,7 @@
       <table>
         <thead>
           <tr>
-            <th>When</th>
+            <th>Last visit (GMT+3)</th>
             <th>Name</th>
             <th>Email</th>
             <th>Source</th>
@@ -110,18 +111,19 @@ async function loadLeads(){
   document.getElementById("who").textContent =
     (sessionStorage.getItem("adminEmail") || "Admin") +
     " · " + unique + " unique emails · " + hits + " total hits";
-  document.getElementById("leads").innerHTML = (rows||[]).map(row =>
-    `<tr>
-      <td>${esc((row.updated_at || row.created_at || "").replace("T"," ").slice(0,16))}</td>
-      <td>${esc(row.name)}</td>
+  document.getElementById("leads").innerHTML = (rows||[]).map(row => {
+    const isTest = String(row.name||"").toUpperCase().startsWith("TEST") || String(row.email||"") === "northlinelimit@gmail.com";
+    return `<tr>
+      <td>${esc(row.when || formatEat(row.updated_at || row.created_at))}</td>
+      <td>${esc(row.name)}${isTest ? '<span class="tag">TEST</span>' : ""}</td>
       <td>${esc(row.email)}</td>
       <td>${esc(row.source)}</td>
       <td class="hits">${esc(row.search_count)}</td>
       <td>${esc(row.paid_credits)}</td>
       <td>${row.wants_help ? "wants help" : ""}</td>
       <td>${esc((row.detail || "").slice(0,140))}</td>
-    </tr>`
-  ).join("") || "<tr><td colspan='8'>No visitor leads yet.</td></tr>";
+    </tr>`;
+  }).join("") || "<tr><td colspan='8'>No visitor leads yet.</td></tr>";
 }
 async function boot(){
   if (!pin) {
@@ -200,6 +202,23 @@ function watch(){
   };
   tick();
   poll = setInterval(tick, 3000);
+}
+function formatEat(iso){
+  if (!iso) return "";
+  const raw = String(iso);
+  const d = new Date(/Z$|[+-]\d\d:\d\d$/.test(raw) ? raw : raw + "Z");
+  if (Number.isNaN(d.getTime())) return raw;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Africa/Nairobi",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).formatToParts(d);
+  const get = (t) => (parts.find(p => p.type === t) || {}).value || "";
+  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")} GMT+3`;
 }
 function esc(s){ return String(s??"").replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 </script>

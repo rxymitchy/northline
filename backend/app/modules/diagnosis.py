@@ -1,132 +1,264 @@
-"""Turn public signals into a visitor diagnosis. Claims stay tied to observed input."""
+"""Turn public signals into a visitor diagnosis.
+
+Every finding is tied to something we actually saw (a quote from their page or their own
+words), explained in plain language, and paired with a concrete fix.
+"""
+
+import re
+
+from app.modules.research import SIGNAL_PATTERNS
+from app.plain import plain_all
+
+# One entry per kind of manual work we can spot.
+PLAYBOOK = {
+    "whatsapp": {
+        "process": "Replying to new enquiries",
+        "human_work": "New enquiries go to WhatsApp, and someone has to read and answer each one by hand.",
+        "why": "Every new customer waits until a person picks up the phone. Slow replies are one of the most common ways small businesses lose sales.",
+        "fix": "Switch to WhatsApp Business and set a greeting, quick replies, and a short menu so people get an answer straight away.",
+        "title": "Answer WhatsApp enquiries straight away",
+        "steps": [
+            "Install WhatsApp Business and add a greeting and an away message.",
+            "Save quick replies for the questions you get most, like prices, location, and opening hours.",
+            "Log each new chat in one list so you can see who still needs an answer.",
+        ],
+    },
+    "booking": {
+        "process": "Booking",
+        "human_work": "Customers have to call to book. There is no online calendar they can use themselves.",
+        "why": "Calls that come in after hours or at busy times get missed, and many of those people book with someone else.",
+        "fix": "Add an online booking link (Calendly or Google Calendar booking pages both work) and send reminders automatically.",
+        "title": "Let customers book online",
+        "steps": [
+            "Set up a booking page with your real open slots.",
+            "Put the link on your site, your social profiles, and your WhatsApp greeting.",
+            "Turn on automatic reminders the day before to cut no shows.",
+        ],
+    },
+    "form": {
+        "process": "Sorting enquiries",
+        "human_work": "Messages from the contact form most likely land in one inbox for someone to read and sort.",
+        "why": "Leads get buried in email, and nobody can tell at a glance who has been answered and who has not.",
+        "fix": "Send every form entry into one shared list with a status and an owner, and send an instant reply so people know you got it.",
+        "title": "Put every enquiry in one list",
+        "steps": [
+            "Connect your form to a shared sheet or a simple CRM so each message becomes a row.",
+            "Send an automatic reply that says when they will hear back.",
+            "Give each enquiry an owner and a status: new, replied, won, or lost.",
+        ],
+    },
+    "followup": {
+        "process": "Following up",
+        "human_work": "Your copy promises that the team will call or get back to people, so someone has to remember to do it.",
+        "why": "Follow up that depends on memory is the first thing to slip when the week gets busy.",
+        "human_work_own": "You follow up by hand, so it only happens if someone remembers.",
+        "fix": "Set automatic reminders so every enquiry gets a reply within a set time, and a nudge if it is still open after two days.",
+        "title": "Make follow up automatic",
+        "steps": [
+            "Decide how fast every enquiry should get a reply, for example within 2 hours.",
+            "Set a reminder that flags any enquiry still waiting past that time.",
+            "Send a friendly automatic check in if a customer goes quiet for two days.",
+        ],
+    },
+    "quote": {
+        "process": "Quotes",
+        "human_work": "Quotes look like they are written by hand for each request.",
+        "why": "Customers wait for a price, and some move on before it arrives.",
+        "human_work_own": "You write each quote by hand.",
+        "fix": "Make a quote template with your standard prices, or a short form that gives a starting price right away.",
+        "title": "Send quotes faster",
+        "steps": [
+            "List your most common jobs and a starting price for each.",
+            "Build a quote template you can fill in within a few minutes.",
+            "Add a short form that asks the questions you always need answered before quoting.",
+        ],
+    },
+    "sheet": {
+        "process": "Keeping records",
+        "human_work": "Work is tracked in a spreadsheet or file that someone updates by hand.",
+        "why": "The sheet is only right if someone remembers to update it, and copying details in by hand leads to mistakes.",
+        "fix": "Have new enquiries added to the sheet automatically, with columns for status, owner, and next step.",
+        "title": "Stop typing enquiries into the spreadsheet",
+        "steps": [
+            "Connect your form or WhatsApp so new enquiries are added as rows on their own.",
+            "Add columns for status, owner, and next step, and keep them up to date.",
+            "Move to a simple CRM once the sheet has more than a few hundred rows.",
+        ],
+    },
+    "social": {
+        "process": "Replying to messages",
+        "human_work": "Interest comes in through DMs and comments, which someone has to read and answer one by one.",
+        "why": "Messages get buried as the feed moves on, and there is no list of who asked what.",
+        "human_work_own": "Leads come in through DMs, and someone has to read and answer each one.",
+        "fix": "Put a link in your bio to a short form or a WhatsApp chat so every enquiry is saved in one place.",
+        "title": "Capture every DM in one place",
+        "steps": [
+            "Add a link in your bio to a short enquiry form or WhatsApp chat.",
+            "Set saved replies for the questions you get most in DMs.",
+            "Keep one list of everyone who asked, so nobody is forgotten.",
+        ],
+    },
+    "application": {
+        "process": "Applications",
+        "human_work": "People apply or send documents, and someone checks each one by hand.",
+        "why": "Missing documents mean back and forth emails, and applicants lose interest while they wait.",
+        "fix": "Use one online form that collects every document at once and tells the applicant what is still missing.",
+        "title": "Collect applications online",
+        "steps": [
+            "Build one form that asks for every document you need.",
+            "Send an automatic message confirming what was received.",
+            "Track each application with a clear status so nothing sits unchecked.",
+        ],
+    },
+}
+
+# Which research signal patterns prove each finding (used to quote their own words).
+PROOF_KEYS = {
+    "whatsapp": ["whatsapp_channel"],
+    "booking": ["call_to_book"],
+    "form": ["enquiry_form"],
+    "followup": ["manual_followup_language"],
+    "quote": ["quote_request"],
+    "sheet": [],
+    "social": ["dm_cta", "comments_cta", "link_in_bio"],
+    "application": ["application_process"],
+}
+EXTRA_PROOF = {
+    "followup": [r"follow[ -]?up", r"get back to you", r"we will call", r"by hand", r"manually"],
+    "sheet": [r"spreadsheet", r"excel", r"google sheets?", r"\bcsv\b"],
+    "whatsapp": [r"whatsapp"],
+    "social": [r"\bdms?\b", r"instagram", r"facebook", r"tiktok"],
+    "quote": [r"\bquot(e|es|ing)\b"],
+}
 
 
 def build_diagnosis(source: str, research: dict, gap: dict, channel: dict | None = None) -> dict:
     signals = research.get("signals") or {}
-    text = (research.get("text") or "").lower()
-    facts = [str(f) for f in (gap.get("facts") or []) if f]
-    if source in ("describe", "csv"):
-        facts = [
-            f.replace(" on the site.", " in what you described.")
-            .replace("Site tells customers", "You described asking people")
-            .replace("Enquiry/contact form present", "Enquiries appear to be collected in a list or form")
-            for f in facts
-        ]
-    processes = _processes(source, signals, text, gap)
+    raw = research.get("text") or ""
+    text = raw.lower()
+    processes = _processes(source, signals, text, raw)
     overall = _overall(processes, gap)
     primary = next((p for p in processes if p["priority"] == "HIGH"), None) or (processes[0] if processes else None)
-    automate = _automate_first(primary, overall, facts)
-    workflow = _workflow(source, signals, text, processes)
-    return {
+    # Their own words are the strongest evidence; fall back to plain observations.
+    facts = _uniq([p["proof"] for p in processes if p.get("proof")]) or _uniq(
+        [str(f) for f in (gap.get("facts") or []) if f and "mention you" not in str(f)]
+    )
+    out = {
         "overall": overall,
         "overall_label": {"HIGH": "High", "MEDIUM": "Medium", "LOW": "Low"}[overall],
         "uncertainty": overall == "LOW" and not processes,
-        "summary": _summary(source, overall, primary, channel, research),
-        "processes": processes,
-        "automate_first": automate,
-        "workflow": workflow,
+        "summary": _summary(source, overall, primary, processes, research),
+        "processes": [{k: v for k, v in p.items() if k not in ("key", "title", "steps")} for p in processes],
+        "automate_first": _automate_first(primary, facts),
+        "workflow": _workflow(source, processes),
         "facts": facts,
         "caveat": (
-            "Based on the information provided, public pages, and web mentions of the company. "
-            "Northline cannot see internal tools, inboxes, or staff workload."
+            "We only used what you shared, your public pages, and mentions of you online. "
+            "We cannot see your inbox, your tools, or how busy your team is, so treat this as a starting point."
         ),
+    }
+    return plain_all(out)
+
+
+def _row(key: str, priority: str, proof: str = "", own_words: bool = False) -> dict:
+    item = PLAYBOOK[key]
+    return {
+        "key": key,
+        "process": item["process"],
+        "human_work": (item.get("human_work_own") if own_words else None) or item["human_work"],
+        "priority": priority,
+        "why": item["why"],
+        "fix": item["fix"],
+        "proof": proof,
+        "title": item["title"],
+        "steps": item["steps"],
     }
 
 
-def _processes(source: str, signals: dict, text: str, gap: dict) -> list[dict]:
-    rows: list[dict] = []
-    if signals.get("whatsapp_channel") or "whatsapp" in text:
-        if not signals.get("chatbot"):
-            rows.append(
-                {
-                    "process": "Lead capture",
-                    "human_work": "Enquiries appear to be collected in WhatsApp for someone to read and reply.",
-                    "priority": "HIGH",
-                    "why": "This sits at the start of the customer journey, so every new lead waits on a person opening the chat.",
-                }
-            )
+def _processes(source: str, signals: dict, text: str, raw: str) -> list[dict]:
+    own_words = source in ("describe", "csv")
+    found: list[tuple[str, str]] = []
+    has_whatsapp = signals.get("whatsapp_channel") or "whatsapp" in text
+    if has_whatsapp and not signals.get("chatbot"):
+        found.append(("whatsapp", "HIGH"))
     if signals.get("call_to_book") and not signals.get("online_booking"):
-        rows.append(
-            {
-                "process": "Booking",
-                "human_work": "People are asked to call or wait to be booked, with no visible self-serve calendar.",
-                "priority": "HIGH",
-                "why": "Missed calls and after-hours interest never become a confirmed slot unless a person is free.",
-            }
-        )
+        found.append(("booking", "HIGH"))
+    if source == "csv" or any(w in text for w in ("excel", "spreadsheet", "google sheet")):
+        found.append(("sheet", "HIGH"))
+    if (
+        source == "social"
+        or signals.get("dm_cta")
+        or signals.get("comments_cta")
+        or (own_words and re.search(r"\bdms?\b|instagram|facebook|tiktok", text))
+    ):
+        found.append(("social", "HIGH"))
     if signals.get("enquiry_form") and not signals.get("crm_mention") and not signals.get("chatbot"):
-        rows.append(
-            {
-                "process": "Qualification",
-                "human_work": "Inbound forms appear to land for a person to sort, with no public CRM or bot mentioned.",
-                "priority": "HIGH" if source in ("website", "describe") else "MEDIUM",
-                "why": "Manual review before follow-up creates a repeated handoff before anyone is qualified.",
-            }
-        )
-    if signals.get("manual_followup_language") or any(w in text for w in ("follow up", "follow-up", "get back to you", "we will call")):
-        rows.append(
-            {
-                "process": "Follow-up",
-                "human_work": "Copy or the description says a person will call or get back to the customer.",
-                "priority": "MEDIUM",
-                "why": "Follow-up that lives in memory is easy to drop when volume rises.",
-            }
-        )
-    if signals.get("quote_request") and not signals.get("ecommerce"):
-        rows.append(
-            {
-                "process": "Quoting",
-                "human_work": "Quotes appear to be assembled by staff rather than a self-serve price or checkout.",
-                "priority": "MEDIUM",
-                "why": "Each quote is another round of typing before the customer can decide.",
-            }
-        )
-    if source == "csv" or "excel" in text or "spreadsheet" in text:
-        rows.append(
-            {
-                "process": "Record keeping",
-                "human_work": "Work is described as living in a file or sheet that someone updates by hand.",
-                "priority": "HIGH",
-                "why": "The sheet becomes the system of record only if a person remembers to keep it current.",
-            }
-        )
-    if source == "social" or signals.get("dm_cta") or signals.get("comments_cta"):
-        if not any(r["process"] == "Lead capture" for r in rows):
-            rows.append(
-                {
-                    "process": "Lead capture",
-                    "human_work": "Interest looks like it still depends on someone reading DMs, comments, or inbox requests.",
-                    "priority": "HIGH",
-                    "why": "Social traffic that is not captured on a page you own disappears when the feed moves on.",
-                }
-            )
-        elif signals.get("dm_cta") and not signals.get("whatsapp_channel") and not signals.get("enquiry_form"):
-            rows.append(
-                {
-                    "process": "Inbox triage",
-                    "human_work": "Public copy asks people to DM, with no visible form or WhatsApp capture beside the profile.",
-                    "priority": "HIGH",
-                    "why": "DM volume does not queue itself — each reply waits on whoever has the phone.",
-                }
-            )
-    # Deduplicate by process name, keep first (usually stronger).
+        found.append(("form", "HIGH" if source in ("website", "describe") else "MEDIUM"))
+    if signals.get("manual_followup_language") or any(
+        w in text for w in ("follow up", "follow-up", "get back to you", "we will call", "manually", "by hand")
+    ):
+        found.append(("followup", "MEDIUM"))
+    wants_quote = signals.get("quote_request") or (own_words and re.search(r"\bquot(e|es|ing)\b", text))
+    if wants_quote and not signals.get("ecommerce"):
+        found.append(("quote", "MEDIUM"))
+    if signals.get("application_process") and not signals.get("customer_portal"):
+        found.append(("application", "MEDIUM"))
+
+    rows = []
     seen = set()
-    out = []
-    for row in rows:
-        if row["process"] in seen:
+    used: set[str] = set()
+    for key, priority in found:
+        if key in seen:
             continue
-        seen.add(row["process"])
-        out.append(row)
-    if not out and (gap.get("gaps") or []):
-        out.append(
-            {
-                "process": "Intake",
-                "human_work": str(gap["gaps"][0]),
-                "priority": "MEDIUM",
-                "why": "Northline found signs of a public process that still waits on a person.",
-            }
-        )
-    return out[:5]
+        seen.add(key)
+        proof = _proof(key, raw, own_words, used)
+        if proof:
+            used.add(proof)
+        rows.append(_row(key, priority, proof, own_words))
+    # Findings with a real quote are stronger; show those first within each priority.
+    rows.sort(key=lambda r: (r["priority"] != "HIGH", not r["proof"]))
+    return rows[:5]
+
+
+def _proof(key: str, raw: str, own_words: bool, used: set[str] | None = None) -> str:
+    if not raw:
+        return ""
+    patterns: list[str] = []
+    for sig in PROOF_KEYS.get(key, []):
+        patterns += SIGNAL_PATTERNS.get(sig, [])
+    patterns += EXTRA_PROOF.get(key, [])
+    for pat in patterns:
+        m = re.search(pat, raw, re.I)
+        if not m:
+            continue
+        snippet = _sentence_around(raw, m.start(), m.end())
+        if len(snippet) < 6:
+            continue
+        lead = "You wrote" if own_words else "Your page says"
+        quote = f'{lead}: "{snippet}"'
+        if used and quote in used:
+            continue
+        return quote
+    return ""
+
+
+# A sentence ends at . ! ? followed by space or end (so "wa.me" or "3.5" do not split), or a newline.
+_BREAK = re.compile(r"[.!?](?=\s|$)|\n")
+
+
+def _sentence_around(raw: str, start: int, end: int, limit: int = 140) -> str:
+    left = -1
+    for m in _BREAK.finditer(raw, 0, start):
+        left = m.start()
+    nxt = _BREAK.search(raw, end)
+    right = nxt.start() if nxt else len(raw)
+    s = re.sub(r"\s+", " ", raw[left + 1 : right]).strip(" \"'")
+    if len(s) > limit:
+        mid = (start - left - 1)
+        lo = max(0, mid - limit // 2)
+        s = s[lo : lo + limit].strip()
+        s = ("…" if lo > 0 else "") + s + "…"
+    return s
 
 
 def _overall(processes: list[dict], gap: dict) -> str:
@@ -137,77 +269,76 @@ def _overall(processes: list[dict], gap: dict) -> str:
     return "LOW"
 
 
-def _summary(source: str, overall: str, primary: dict | None, channel: dict | None, research: dict | None = None) -> str:
-    channel_state = (channel or {}).get("state") or ""
-    mentions = (research or {}).get("public_mentions") or []
-    pages = (research or {}).get("pages") or []
-    extra = ""
-    if mentions:
-        extra = f" Public web mentions were checked ({len(mentions)} sources) alongside the link or description you sent."
-    if pages:
-        extra += f" {len(pages)} public page{'s' if len(pages) != 1 else ''} could be read."
-    if overall == "LOW":
+def _summary(source: str, overall: str, primary: dict | None, processes: list[dict], research: dict) -> str:
+    pages = len(research.get("pages") or [])
+    mentions = len(research.get("public_mentions") or [])
+    read = ""
+    if source in ("website", "social") and (pages or mentions):
+        parts = []
+        if pages:
+            parts.append(f"{pages} page{'s' if pages != 1 else ''} of yours")
+        if mentions:
+            parts.append(f"{mentions} other place{'s that mention' if mentions != 1 else ' that mentions'} you")
+        read = " We read " + " and ".join(parts) + "."
+    if overall == "LOW" or not primary:
         return (
-            "Northline found limited public evidence of a repeated manual handoff. "
-            "That does not mean the work is automated — only that it is not visible from what was provided."
-            + extra
+            "We did not find clear signs of work being done by hand in what we could see. "
+            "That does not mean nothing can be improved, only that it was not visible from what you shared." + read
         )
-    if primary:
-        return (
-            f"Based on the information provided, {primary['process'].lower()} still looks staff-dependent. "
-            f"{primary['why']}"
-            + extra
-        )
-    if channel_state:
-        return channel_state + extra
-    src = {"website": "the website", "social": "the profile", "csv": "the file", "describe": "the process you described"}.get(
-        source, "what you sent"
-    )
-    return f"Northline reviewed {src} and found signs that intake still waits on a person." + extra
+    count = len(processes)
+    if count > 1:
+        lead = f"We found {count} places where work still depends on someone doing it by hand. The biggest one: "
+    else:
+        lead = "The main thing we found: "
+    return f"{lead}{primary['human_work'][0].lower()}{primary['human_work'][1:]} {primary['why']}{read}"
 
 
-def _automate_first(primary: dict | None, overall: str, facts: list[str]) -> dict:
+def _automate_first(primary: dict | None, facts: list[str]) -> dict:
     if not primary:
         return {
-            "title": "Watch the first handoff, not the whole company",
+            "title": "Start with how new enquiries reach you",
             "reason": (
-                "Northline could not see a single dominant public bottleneck. "
-                "If work still depends on one inbox or chat, that first capture step is usually the highest-value place to start — but that is a suggestion, not something observed here."
+                "We could not see one clear bottleneck from what you shared. "
+                "A good first check is how fast you reply to a new enquiry and whether any get missed. "
+                "That is usually where small businesses lose the most time and sales."
             ),
+            "steps": [
+                "Count how many enquiries came in last week and how long each took to get a reply.",
+                "Write down every place enquiries arrive: phone, email, WhatsApp, social, walk ins.",
+                "Pick the busiest one and set up an instant reply there first.",
+            ],
             "evidence": facts[:3],
         }
     return {
-        "title": primary["process"],
-        "reason": (
-            f"Your {primary['process'].lower()} process appears to depend on manual work before the next step. "
-            f"{primary['why']} "
-            "Because this happens early, it is the highest-value workflow to address first."
-        ),
+        "title": primary["title"],
+        "reason": f"{primary['why']} {primary['fix']}",
+        "steps": primary["steps"],
         "evidence": facts[:4],
         "human_work": primary["human_work"],
     }
 
 
-def _workflow(source: str, signals: dict, text: str, processes: list[dict]) -> list[str]:
-    names = {p["process"] for p in processes}
-    steps = ["Incoming enquiry"]
-    if "Lead capture" in names or source in ("social", "website", "describe"):
-        steps.append("capture")
-    if "Qualification" in names or signals.get("enquiry_form"):
-        steps.append("qualification")
-    if "Record keeping" in names or "excel" in text or source == "csv":
-        steps.append("CRM / database")
-    else:
-        steps.append("shared log")
-    if "Quoting" in names:
-        steps.append("quote")
-    if "Booking" in names:
-        steps.append("booking")
-    steps.append("follow-up")
-    steps.append("human handoff when needed")
-    # Keep unique order
+def _workflow(source: str, processes: list[dict]) -> list[str]:
+    keys = {p["key"] for p in processes}
+    steps = ["New enquiry", "Instant reply"]
+    steps.append("Saved in one list")
+    if "booking" in keys:
+        steps.append("Customer books a slot online")
+    if "quote" in keys:
+        steps.append("Quote sent from a template")
+    if "application" in keys:
+        steps.append("Documents checked")
+    steps.append("Reminder if nobody has replied")
+    steps.append("A person steps in when needed")
+    return steps
+
+
+def _uniq(items: list[str]) -> list[str]:
+    seen = set()
     out = []
-    for step in steps:
-        if step not in out:
-            out.append(step)
+    for item in items:
+        k = item.strip().lower()
+        if k and k not in seen:
+            seen.add(k)
+            out.append(item)
     return out

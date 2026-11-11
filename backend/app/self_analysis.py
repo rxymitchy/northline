@@ -16,6 +16,7 @@ from app.modules.opportunity import detect_opportunity
 from app.modules.peers import find_better_companies, guess_industry
 from app.modules.research import visitor_research
 from app.modules.scoring import score_prospect
+from app.plain import plain_all
 
 
 def normalize_website(raw: str) -> str:
@@ -94,7 +95,7 @@ def run_search(run_id: int) -> None:
         company.recommended_offer = opportunity.get("recommended_offer") or "Automate the repetitive hand-offs we can see."
         company.confidence = opportunity.get("confidence") or ("Medium" if gap.get("exists") else "Low")
 
-        notes = channel_notes(source, company.website or sub.get("url") or "", research, gap)
+        notes = plain_all(channel_notes(source, company.website or sub.get("url") or "", research, gap))
         diagnosis = build_diagnosis(source, research, gap, notes)
         company.observed_problem = diagnosis.get("summary") or opportunity.get("observed_problem") or gap.get("summary")
         company.automation_opportunity = (diagnosis.get("automate_first") or {}).get("reason") or company.automation_opportunity
@@ -169,7 +170,7 @@ def run_search(run_id: int) -> None:
             Outreach(
                 company_id=company.id,
                 contact_id=contact.id,
-                subject=f"Your {BRAND} report — {name}",
+                subject=f"Your {BRAND} report for {name}",
                 body=brief["text"],
                 pitch_rationale="Requested search.",
                 status="draft",
@@ -235,11 +236,11 @@ def email_report(run_id: int) -> dict:
         fi["brief"] = brief
         company.fact_inference = json.dumps(fi)
         db.commit()
-        subject = f"Your Northline operations snapshot — {company.name}"
+        subject = f"Your Northline operations snapshot for {company.name}"
         intro = (
             f"Hi {company.name},\n\n"
             "Here is the operations snapshot you asked Northline to prepare. "
-            "It is based on what you submitted and what is visible publicly — not on internal systems we cannot see.\n\n"
+            "It is based on what you shared and what we could see publicly. We cannot see your internal tools.\n\n"
         )
         body = intro + (brief.get("text") or company.observed_problem or "Your report is ready.")
         html = brief.get("html")

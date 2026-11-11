@@ -1,3 +1,5 @@
+import os
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -10,6 +12,9 @@ class Base(DeclarativeBase):
 
 def database_url() -> str:
     url = (settings.database_url or "").strip() or "sqlite:///./data/prospects.db"
+    if os.environ.get("VERCEL") and url.startswith("sqlite"):
+        # Vercel's disk is read-only and wiped between requests: leads would vanish.
+        raise RuntimeError("DATABASE_URL must point to a hosted Postgres database on Vercel (e.g. Neon).")
     if url.startswith("postgres://"):
         url = "postgresql://" + url[len("postgres://") :]
     if url.startswith("postgresql") and "sslmode=" not in url:
@@ -27,6 +32,10 @@ if _is_sqlite(_URL):
     _ENGINE_KW["connect_args"] = {"check_same_thread": False}
 else:
     _ENGINE_KW["pool_recycle"] = 300
+    if os.environ.get("VERCEL"):
+        # Many short-lived instances: keep each one's pool small so Postgres is not flooded.
+        _ENGINE_KW["pool_size"] = 3
+        _ENGINE_KW["max_overflow"] = 2
 
 engine = create_engine(_URL, **_ENGINE_KW)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

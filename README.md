@@ -32,6 +32,19 @@ py -3.13 -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
 Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Python 3.12+.
 
+## Deploy on Vercel
+
+1. Import the repo in Vercel and set **Root Directory** to `backend`. `backend/vercel.json` sends every request to FastAPI and allows 300 seconds per request.
+2. Add a Postgres database (Neon from the Vercel Marketplace works) and set `DATABASE_URL`. The app will not start on Vercel without it, because Vercel's disk does not keep files.
+3. Add the other secrets from `.env.example` (`OPENAI_API_KEY`, `ADMIN_PIN`, SMTP settings, `LIGHTNING_ADDRESS`, and so on).
+4. To bring over existing data, run this once from `backend` (the target must be empty):
+
+   ```powershell
+   py -3.13 scripts/copy_db.py "<old DATABASE_URL>" "<new DATABASE_URL>"
+   ```
+
+On Vercel each diagnosis runs inside a request (`POST /api/runs/{id}/start`) while the page polls for progress, because Vercel stops background work once a response is sent.
+
 ## License
 
 [MIT](LICENSE) — copyright Northline, 2026. See [CONTRIBUTING.md](CONTRIBUTING.md) if you want to help.
