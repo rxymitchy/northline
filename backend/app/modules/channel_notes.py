@@ -32,96 +32,88 @@ def channel_notes(source: str, url: str, research: dict, gap: dict) -> dict:
 
 
 def _social(network: str | None, text: str, signals: dict, gaps: list) -> dict:
-    label = network or "this profile"
-    art = "an" if label[0].lower() in "aeiou" else "a"
-    state = f"We reviewed {art} {label} presence. People can find you there, but the next step still looks like a person reading messages."
+    label = network or "social media"
+    state = f"People can find you on {label}, but turning that interest into a customer still depends on someone reading and answering messages."
     if "login" in text or "log in" in text:
-        state += " A lot of the real conversation is behind the login, so public pages only show part of the work."
+        state += " Much of the profile is behind a login, so we could only see part of it."
     missing = [
-        "A capture step in the bio (form or WhatsApp) so interest does not die in DMs.",
-        "A page you own (even one landing page) so the algorithm is not the only storefront.",
+        "A link in your bio to a short form or WhatsApp chat, so interest does not get lost in DMs.",
+        "A page you own, even a single landing page, so you are not relying only on the app to show your work.",
     ]
     others = {
-        "Instagram": ["WhatsApp Business", "TikTok", "Google Business Profile", "a simple website"],
-        "Facebook": ["WhatsApp Business", "Instagram", "Google Business Profile", "a booking link"],
-        "TikTok": ["Instagram", "WhatsApp Business", "YouTube Shorts", "a landing page in the bio"],
-        "LinkedIn": ["a company website", "WhatsApp or email capture", "Google Business Profile"],
-        "YouTube": ["a website with a clear CTA", "WhatsApp Business", "LinkedIn"],
-        "WhatsApp": ["a website or Google Business Profile", "Instagram", "a shared inbox / CRM"],
+        "Instagram": ["WhatsApp Business", "TikTok", "a Google Business Profile", "a simple website"],
+        "Facebook": ["WhatsApp Business", "Instagram", "a Google Business Profile", "a booking link"],
+        "TikTok": ["Instagram", "WhatsApp Business", "YouTube Shorts", "a landing page in your bio"],
+        "LinkedIn": ["a company website", "an email signup", "a Google Business Profile"],
+        "YouTube": ["a website with one clear next step", "WhatsApp Business", "LinkedIn"],
+        "WhatsApp": ["a website or Google Business Profile", "Instagram", "a shared inbox"],
         "X": ["LinkedIn", "a website", "WhatsApp Business"],
     }
-    explore = [
-        f"Also try {', '.join(others.get(network or '', ['WhatsApp Business', 'Instagram', 'Google Business Profile', 'a one-page site']))}."
-    ]
+    picks = others.get(network or "", ["WhatsApp Business", "Instagram", "a Google Business Profile", "a simple website"])
+    explore = [f"Worth adding: {', '.join(picks[:-1])} and {picks[-1]}."]
     if network != "WhatsApp":
-        explore.append("WhatsApp Business with a menu beats hoping someone opens the app.")
+        explore.append("WhatsApp Business with a short menu, so people get an answer without waiting for you.")
     if network != "LinkedIn":
-        explore.append("LinkedIn if you sell to other businesses, not only consumers.")
-    missing.extend(gaps[:2])
+        explore.append("LinkedIn, if you sell to other businesses.")
     return _pack(state, missing, explore)
 
 
 def _website(text: str, signals: dict, gaps: list) -> dict:
-    state = "We reviewed the website as the public front door."
+    state = "Your website is the first place many customers will check, so we looked at what happens after someone decides to get in touch."
     if signals.get("whatsapp_channel") and not signals.get("chatbot"):
-        state = "The site sends people to WhatsApp. That works until volume grows and nobody replies in time."
+        state = "Your site sends people to WhatsApp. That works well until messages pile up and replies slow down."
     elif signals.get("call_to_book") and not signals.get("online_booking"):
-        state = "The site still says call to book. That is extra work and easy to miss after hours."
+        state = "Your site asks people to call to book. Calls after hours or at busy times are easy to miss."
     elif signals.get("enquiry_form") and not signals.get("crm_mention"):
-        state = "There is a form, but nothing public says those leads are tracked. They likely land in one inbox."
+        state = "Your site has a contact form, but nothing shows how those messages are tracked. They most likely land in one inbox."
     missing = []
     explore = []
     if not signals.get("online_booking") and not signals.get("ecommerce"):
-        missing.append("Self-serve booking, quoting, or checkout so staff are not the only path.")
-        explore.append("A simple booking page or checkout — depending on what you sell.")
+        missing.append("A way for customers to book, get a price, or pay without waiting for a person.")
+        explore.append("A simple booking page or online checkout, depending on what you sell.")
     if not _has_social(text):
-        missing.append("Links to where you actually talk to customers (Instagram, Facebook, TikTok, LinkedIn).")
-        explore.append("Pick one social app for proof of work, then point it back to this site.")
+        missing.append("Links to where you talk to customers, such as Instagram, Facebook, TikTok, or LinkedIn.")
+        explore.append("Pick one social app to show your work, and link it back to your site.")
     if not signals.get("whatsapp_channel"):
-        explore.append("WhatsApp Business as a capture channel, with follow-up that is not typed by hand.")
-    explore.append("Google Business Profile if people search you on Maps.")
-    missing.extend(gaps[:2])
+        explore.append("WhatsApp Business with automatic replies, so new enquiries get an answer straight away.")
+    explore.append("A Google Business Profile, if people look for you on Google Maps.")
     return _pack(state, missing, explore)
 
 
 def _csv(text: str, gaps: list) -> dict:
     cols = text.split("\n")[0] if text else ""
-    state = "We read the file. Work is sitting in rows, which usually means a person is moving status by hand."
+    state = "We read your file. Work kept in rows usually means someone updates each one by hand."
     if any(w in cols.lower() for w in ("lead", "customer", "name", "phone", "email")):
-        state = "This looks like a lead or customer list. The file is the system — until someone forgets to update a row."
+        state = "This looks like a list of leads or customers. It is only accurate if someone remembers to update every row."
     missing = [
-        "A live list with owner, status, and next action — not another export.",
-        "A way new enquiries write themselves into that list (form, WhatsApp, or email).",
+        "One live list with an owner, a status, and a next step for each row, instead of new exports.",
+        "A way for new enquiries to add themselves to the list from your form, WhatsApp, or email.",
     ]
     explore = [
-        "Google Sheets or Airtable if you are not ready for a CRM; HubSpot or a simple CRM when the file keeps breaking.",
-        "A website or WhatsApp form that appends a row instead of copy-paste.",
-        "Google Business Profile and one social channel so leads do not only arrive in that spreadsheet.",
+        "Google Sheets or Airtable for now, and a simple CRM such as HubSpot once the sheet gets hard to manage.",
+        "A website or WhatsApp form that adds a new row on its own, so nobody has to copy details across.",
     ]
-    missing.extend(gaps[:2])
     return _pack(state, missing, explore)
 
 
 def _describe(text: str, gaps: list) -> dict:
-    state = "We read how you said work moves. It still depends on someone remembering to follow up."
+    state = "From what you told us, a lot still depends on someone remembering to reply and follow up."
     missing = []
     explore = []
     if "whatsapp" in text:
-        state = "WhatsApp is the front door. Unread chats and no log of promises is the typical leak."
-        missing.append("A log outside the phone: who asked, what they wanted, who owns the reply.")
-        explore.append("WhatsApp Business menus, then a sheet or CRM the chat writes into.")
+        state = "WhatsApp is how most customers reach you. Unread chats and promises nobody wrote down are where things slip."
+        missing.append("A record outside your phone of who asked, what they wanted, and who is replying.")
+        explore.append("WhatsApp Business quick replies, with each new chat saved to a sheet or CRM.")
     if "excel" in text or "spreadsheet" in text or "google sheet" in text:
-        missing.append("A step that does not start with copy-paste into a sheet.")
-        explore.append("A form or WhatsApp capture that lands in the sheet automatically.")
+        missing.append("A way to fill the sheet without copying and pasting.")
+        explore.append("A form or WhatsApp chat that adds each enquiry to the sheet automatically.")
     if "email" in text:
-        explore.append("A shared inbox so enquiries are not stuck on one person's Gmail.")
+        explore.append("A shared inbox, so enquiries are not stuck in one person's email.")
     if "call" in text or "phone" in text:
-        explore.append("A booking link so fewer people have to wait for a call back.")
-    explore.append("A simple website or Google Business Profile if customers cannot find a written offer.")
-    explore.append("Instagram, Facebook, or TikTok if the story of the work never leaves the inbox.")
-    missing.extend(gaps[:2])
+        explore.append("An online booking link, so fewer people have to wait for a call back.")
     if not missing:
-        missing.append("One written path (form, booking, or WhatsApp menu) so the process is not only in someone's head.")
+        missing.append("One clear path for new enquiries, like a form, a booking link, or a WhatsApp menu, so the process is not only in someone's head.")
+    explore.append("A simple website or Google Business Profile, if customers cannot easily find what you offer.")
     return _pack(state, missing, explore)
 
 

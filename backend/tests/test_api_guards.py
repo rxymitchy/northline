@@ -83,6 +83,34 @@ class ApiGuardTests(unittest.TestCase):
         self.assertEqual(r.status_code, 400)
         self.assertNotIn("@blink", (r.text or "").lower())
 
+    def test_serverless_mode_runs_inside_start_request(self):
+        """On Vercel the search only queues; POST /start does the work and is safe to repeat."""
+        import uuid
+        from unittest.mock import patch
+
+        email = f"inline-{uuid.uuid4().hex[:8]}@gmail.com"
+        with patch("app.api.settings.inline_runs", True):
+            r = self.client.post(
+                "/api/search",
+                data={
+                    "name": "Sam",
+                    "email": email,
+                    "source": "describe",
+                    "description": "Leads come on WhatsApp. Someone copies them into Excel by hand.",
+                },
+            )
+            self.assertEqual(r.status_code, 200, r.text)
+            body = r.json()
+            self.assertTrue(body.get("start"))
+            run_id = body["id"]
+            self.assertEqual(self.client.get(f"/api/runs/{run_id}").json().get("status"), "queued")
+            started = self.client.post(f"/api/runs/{run_id}/start")
+            self.assertEqual(started.status_code, 200, started.text)
+            self.assertEqual(started.json().get("status"), "completed")
+            again = self.client.post(f"/api/runs/{run_id}/start")
+            self.assertEqual(again.json().get("status"), "completed")
+        self.assertEqual(self.client.post("/api/runs/999999/start").status_code, 404)
+
     def test_describe_flow_builds_downloadable_report(self):
         r = self.client.post(
             "/api/search",
@@ -227,6 +255,14 @@ class ApiGuardTests(unittest.TestCase):
     def test_wrong_admin_pin(self):
         r = self.client.post("/api/admin/unlock", json={"pin": "definitely-wrong-pin-xx"})
         self.assertEqual(r.status_code, 403)
+
+    def test_format_eat_is_gmt_plus_3(self):
+        from datetime import datetime, timezone
+
+        from app.api import format_eat
+
+        stamped = datetime(2026, 10, 12, 15, 3, tzinfo=timezone.utc)
+        self.assertEqual(format_eat(stamped), "2026-10-12 18:03 GMT+3")
 
     def test_admin_login_page_exists(self):
         r = self.client.get("/admin")

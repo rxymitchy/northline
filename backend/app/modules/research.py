@@ -32,7 +32,7 @@ SIGNAL_PATTERNS = {
     "application_process": [r"apply now", r"application form", r"submit documents"],
     "customer_portal": [r"client portal", r"customer portal", r"login to your account"],
     "manual_followup_language": [r"we will (call|contact|get back)", r"our team will"],
-    "dm_cta": [r"\bdm (me|us)\b", r"send (us )?a dm", r"message us", r"inbox us", r"slide into"],
+    "dm_cta": [r"\bdm (me|us)\b", r"send (us )?a dm", r"\bmessage us\b", r"\binbox us\b", r"slide into"],
     "link_in_bio": [r"link in bio", r"linktr\.ee", r"beacons\.ai", r"stan\.store"],
     "comments_cta": [r"comment below", r"drop a comment", r"comment .{0,12}(for|to) (price|details|link)"],
 }

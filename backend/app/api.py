@@ -1,7 +1,8 @@
 import hmac
 import json
+import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from threading import Thread
 from urllib.parse import urlparse
 
@@ -23,9 +24,35 @@ from app.tip import create_tip_invoice, tip_menu, tip_rate_ok, usd_label
 
 FREE_DIAGNOSES = 5
 EXTRA_DIAGNOSIS_SATS = 1000
+EAT = timezone(timedelta(hours=3))
+
+
+def format_eat(dt: datetime | None) -> str:
+    if not dt:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(EAT).strftime("%Y-%m-%d %H:%M GMT+3")
 
 
 router = APIRouter()
+
+# A run stuck longer than this was almost certainly killed (deploy, timeout); let the visitor retry.
+STALE_RUN = timedelta(minutes=10)
+
+
+def inline_runs() -> bool:
+    """True on serverless hosts, where background threads are frozen after the response."""
+    return bool(settings.inline_runs or os.environ.get("VERCEL"))
+
+
+def _is_stale(run: "ResearchRun") -> bool:
+    started = run.created_at
+    if not started:
+        return False
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - started > STALE_RUN
 
 
 def _has_public_link(url: str) -> bool:
@@ -154,7 +181,18 @@ async def create_search(
     if inquiry and inquiry.run_id:
         live = db.get(ResearchRun, inquiry.run_id)
         if live and live.kind == "search" and live.status in ("queued", "running"):
-            return {"id": live.id, "status": live.status, "lead_saved": True, "reused": True}
+            if _is_stale(live):
+                live.status = "failed"
+                live.error = "This diagnosis did not finish. Please run it again."
+                db.commit()
+            else:
+                return {
+                    "id": live.id,
+                    "status": live.status,
+                    "lead_saved": True,
+                    "reused": True,
+                    "start": inline_runs() and live.status == "queued",
+                }
     used = int(inquiry.search_count or 0) if inquiry else 0
     if used >= FREE_DIAGNOSES and (unlock or "").strip() != "1":
         try:
@@ -203,8 +241,32 @@ async def create_search(
             )
         )
     db.commit()
+    if inline_runs():
+        # The page calls POST /runs/{id}/start next, and polls progress while that request works.
+        return {"id": run.id, "status": run.status, "lead_saved": True, "start": True}
     Thread(target=run_search, args=(run.id,), daemon=True).start()
     return {"id": run.id, "status": run.status, "lead_saved": True}
+
+
+@router.post("/runs/{run_id}/start")
+def start_search(run_id: int, db: Session = Depends(get_db)):
+    """Run a queued visitor diagnosis inside this request (used on serverless hosts)."""
+    run = db.get(ResearchRun, run_id)
+    if not run or (getattr(run, "kind", None) or "") != "search":
+        raise HTTPException(404, "Not found")
+    # Claim it atomically so a double click or retry cannot run it twice.
+    claimed = (
+        db.query(ResearchRun)
+        .filter(ResearchRun.id == run_id, ResearchRun.status == "queued")
+        .update({"status": "running"}, synchronize_session=False)
+    )
+    db.commit()
+    if not claimed:
+        db.refresh(run)
+        return {"id": run.id, "status": run.status}
+    run_search(run_id)
+    db.refresh(run)
+    return {"id": run.id, "status": run.status}
 
 
 @router.post("/runs/{run_id}/help")
@@ -268,6 +330,7 @@ def list_leads(db: Session = Depends(get_db), x_admin_pin: str | None = Header(d
             "paid_credits": int(getattr(row, "paid_credits", 0) or 0),
             "created_at": row.created_at.isoformat() if row.created_at else None,
             "updated_at": row.updated_at.isoformat() if getattr(row, "updated_at", None) else None,
+            "when": format_eat(getattr(row, "updated_at", None) or row.created_at),
         }
         for row in rows
     ]
@@ -306,7 +369,7 @@ def download_report(run_id: int, db: Session = Depends(get_db)):
     if not run:
         raise HTTPException(
             404,
-            "This snapshot is no longer on the server. Run See the diagnosis again, then download.",
+            "This snapshot is no longer on the server. Run the diagnosis again, then download.",
         )
     company = (
         db.query(Company)
@@ -351,6 +414,11 @@ def create_run(
     db.add(run)
     db.commit()
     db.refresh(run)
+    if inline_runs():
+        # Serverless: run inside this request (bounded by the host's max duration).
+        run_pipeline(run.id)
+        db.refresh(run)
+        return {"id": run.id, "status": run.status, "kind": run.kind}
     Thread(target=run_pipeline, args=(run.id,), daemon=True).start()
     return {"id": run.id, "status": run.status, "kind": run.kind}
 

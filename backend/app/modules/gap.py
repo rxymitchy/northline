@@ -1,4 +1,4 @@
-"""Detect a literal automation gap from public page signals — no invented problems."""
+"""Detect a literal automation gap from public page signals. No invented problems."""
 
 from __future__ import annotations
 
@@ -35,42 +35,42 @@ def detect_automation_gap(research: dict, track: str | None) -> dict:
     facts: list[str] = []
 
     if signals.get("whatsapp_channel") or research.get("whatsapps"):
-        facts.append("Public WhatsApp enquiry/contact channel on the site.")
+        facts.append("Customers are asked to contact you on WhatsApp.")
         if not signals.get("chatbot"):
-            gaps.append("WhatsApp is used as a customer channel with no visible chatbot — follow-up is likely manual.")
+            gaps.append("WhatsApp is used for customers with no automatic replies, so someone answers every chat by hand.")
     if signals.get("call_to_book") and not signals.get("online_booking"):
-        facts.append("Site tells customers to call to book.")
-        gaps.append("No visible online booking — appointment/lead capture looks staff-dependent.")
+        facts.append("Customers are told to call to book.")
+        gaps.append("There is no online booking, so every booking needs a person on the phone.")
     if signals.get("quote_request") and not signals.get("ecommerce"):
-        facts.append("Quote/request process is on the site.")
-        gaps.append("Quote requests appear form/WhatsApp based rather than a self-serve workflow.")
+        facts.append("Customers can ask for a quote.")
+        gaps.append("Quotes seem to be written by hand for each request.")
     if signals.get("manual_followup_language"):
-        facts.append("Copy says the team will call or get back to the customer.")
-        gaps.append("Follow-up is described as a person calling back — a classic automation gap.")
+        facts.append("Your copy says the team will call or get back to people.")
+        gaps.append("Follow up depends on a person remembering to call back.")
     if signals.get("enquiry_form") and not signals.get("crm_mention") and not signals.get("chatbot"):
-        facts.append("Enquiry/contact form present; no CRM or chatbot mentioned.")
-        gaps.append("Inbound enquiries likely land in email/WhatsApp with manual qualification.")
+        facts.append("There is a contact form, and nothing shows where those messages go next.")
+        gaps.append("New enquiries most likely land in one inbox for someone to sort.")
     if signals.get("dm_cta") or signals.get("comments_cta"):
-        facts.append("Public copy asks people to DM or comment rather than use a form they own.")
-        gaps.append("Social inbox capture still looks staff-dependent.")
+        facts.append("People are asked to DM or comment instead of using a form.")
+        gaps.append("Someone has to read and answer every DM by hand.")
     if signals.get("link_in_bio"):
-        facts.append("A link-in-bio or similar hub is mentioned.")
+        facts.append("There is a link in bio page.")
     mentions = research.get("public_mentions") or []
     if mentions:
-        facts.append(f"Found {len(mentions)} public web mentions besides the submitted link.")
+        facts.append(f"Found {len(mentions)} other places online that mention you.")
     if signals.get("online_booking") and signals.get("chatbot"):
-        facts.append("Online booking and a chatbot are both visible — less of an ops gap.")
+        facts.append("Online booking and automatic chat replies are already in place.")
 
     if (track or "") == "agency_partner" or _looks_like_agency(text):
         if any(s in text for s in AGENCY_SERVICE):
-            facts.append("Site sells marketing/web/branding-type services to clients.")
+            facts.append("You sell marketing, web, or branding services to clients.")
             if not any(s in text for s in ALREADY_AUTOMATED):
                 gaps.append(
-                    "Agency services stop at marketing/web — no public WhatsApp/CRM/AI/custom-backend offer, so client technical work is a likely overflow gap."
+                    "Your services stop at marketing and web, so technical client work like WhatsApp, CRM, or AI setups may be going elsewhere."
                 )
             else:
                 gaps.append(
-                    "They mention some technical/AI work; still a possible overflow gap when client jobs need extra engineering."
+                    "You mention some technical or AI work. Bigger client builds may still need extra help."
                 )
 
     exists = len(gaps) > 0

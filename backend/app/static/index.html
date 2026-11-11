@@ -4,77 +4,146 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Northline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,500&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #f7f7f5;
-      --ink: #171717;
-      --mute: #5c5c5c;
-      --line: #e4e4e0;
-      --green: #15803d;
-      --green-hover: #166534;
+      --bg: #f7f8f6;
+      --ink: #0c0d0b;
+      --mute: #5c635c;
+      --line: #e3e6e1;
+      --green: #147a43;
+      --green-hover: #0f5f34;
+      --mint: #8fd9a4;
       --card: #fff;
       --high: #9a3412;
       --med: #854d0e;
       --low: #3f6212;
+      --serif: "Fraunces", Georgia, serif;
+      --sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
     }
     * { box-sizing: border-box; }
-    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 16px/1.55 ui-sans-serif, system-ui, Segoe UI, sans-serif; }
-    .page { max-width: 680px; margin: 0 auto; padding: 8vh 20px 88px; }
-    h1 { font-size: clamp(26px, 4vw, 34px); font-weight: 650; letter-spacing: -.03em; line-height: 1.2; margin: 0 0 10px; text-align: center; }
-    .brand { text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--green); margin: 0 0 14px; }
-    .slogan { text-align: center; color: var(--mute); margin: 0 0 18px; font-size: 15px; }
-    .how { margin: 0 auto 22px; padding: 0; list-style: none; max-width: 420px; color: var(--mute); font-size: 14px; }
-    .how li { display: flex; gap: 10px; margin: 8px 0; text-align: left; line-height: 1.4; }
-    .how b { color: var(--ink); font-weight: 650; min-width: 1.2em; }
-    .choose-label { font-size: 13px; font-weight: 700; margin: 0 0 8px; color: var(--ink); }
-    .path-hint { font-size: 13px; color: var(--mute); margin: 0 0 16px; }
+    html { scroll-behavior: smooth; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--sans); }
+    body {
+      background:
+        radial-gradient(1200px 520px at 12% -10%, rgba(143,217,164,.28), transparent 58%),
+        radial-gradient(900px 480px at 110% 8%, rgba(20,122,67,.08), transparent 50%),
+        var(--bg);
+    }
+    .nav {
+      position: sticky; top: 0; z-index: 20;
+      display: flex; justify-content: center; padding: 16px 16px 0;
+    }
+    .nav-pill {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,.78);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(12,13,11,.08);
+      border-radius: 999px;
+      padding: 6px 6px 6px 14px;
+      box-shadow: 0 8px 30px rgba(12,13,11,.06);
+    }
+    .brand-lockup {
+      display: flex; align-items: center; gap: 8px;
+      text-decoration: none; color: inherit; font-weight: 600; font-size: 14px;
+      padding-right: 8px;
+    }
+    .mark {
+      width: 28px; height: 28px; border-radius: 9px;
+      background: #0c0d0b; color: var(--mint);
+      display: grid; place-items: center; font-size: 13px; font-weight: 700;
+    }
+    .nav-link {
+      color: rgba(12,13,11,.7); text-decoration: none; font-size: 13px;
+      padding: 0 12px; border-radius: 999px;
+    }
+    .nav-cta {
+      background: var(--green); color: #fff; text-decoration: none;
+      font-size: 13px; font-weight: 500; border-radius: 999px;
+      padding: 10px 18px;
+    }
+    .page { max-width: 920px; margin: 0 auto; padding: 28px 20px 96px; }
+    .hero { padding: 7vh 8px 28px; max-width: 760px; }
+    h1 {
+      font-size: clamp(40px, 7vw, 72px); font-weight: 500;
+      letter-spacing: -.04em; line-height: .98; margin: 0 0 18px;
+    }
+    h1 em {
+      font-family: var(--serif); font-style: italic; font-weight: 500;
+      color: #3d9a63; letter-spacing: -.04em; padding-right: .04em;
+    }
+    .lead { color: var(--mute); margin: 0; font-size: clamp(16px, 2vw, 19px); max-width: 34rem; }
+    .how-block { margin: 28px 0 40px; padding: 8px 8px 0; }
+    .how-block h2 { font-size: clamp(28px, 4vw, 40px); font-weight: 500; letter-spacing: -.03em; margin: 0 0 18px; }
+    .how { margin: 0; padding: 0; list-style: none; }
+    .how li {
+      display: grid; grid-template-columns: 48px minmax(0, 1.1fr) minmax(0, 1.2fr);
+      gap: 16px; align-items: baseline;
+      padding: 18px 0; border-top: 1px solid var(--line);
+      text-align: left; line-height: 1.45;
+    }
+    .how b { color: var(--green); font-weight: 600; font-size: 13px; letter-spacing: .04em; }
+    .how strong { font-weight: 500; font-size: 22px; letter-spacing: -.02em; }
+    .how span { color: var(--mute); font-size: 15px; }
+    .sheet {
+      background: rgba(255,255,255,.78);
+      border: 1px solid rgba(12,13,11,.06);
+      border-radius: 28px;
+      padding: 28px 24px 24px;
+      box-shadow: 0 18px 50px rgba(12,13,11,.05);
+    }
+    .choose-label { font-size: 13px; font-weight: 600; margin: 0 0 10px; color: var(--ink); }
+    .path-hint { font-size: 14px; color: var(--mute); margin: 0 0 16px; }
     .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
     .choice {
       border: 1px solid var(--line);
-      background: var(--card);
-      border-radius: 10px;
-      padding: 14px 12px;
-      text-align: center;
+      background: #fff;
+      border-radius: 18px;
+      padding: 16px 14px;
+      text-align: left;
       cursor: pointer;
-      font-size: 14px;
-      font-weight: 600;
+      font: 500 15px/1.25 var(--sans);
+      display: flex; flex-direction: column; gap: 4px;
     }
-    .choice:hover, .choice.on { border-color: var(--green); box-shadow: 0 0 0 3px rgba(21,128,61,.16); }
-    label { display: block; font-size: 13px; color: var(--mute); margin: 12px 0 6px; }
+    .choice span { font-size: 13px; font-weight: 400; color: var(--mute); }
+    .choice:hover, .choice.on { border-color: var(--green); box-shadow: 0 0 0 3px rgba(20,122,67,.14); }
+    label { display: block; font-size: 13px; color: var(--mute); margin: 14px 0 6px; font-weight: 500; }
     input, textarea {
       width: 100%;
       border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 12px 14px;
+      border-radius: 14px;
+      padding: 13px 15px;
       font: inherit;
       background: #fff;
     }
     textarea { min-height: 120px; resize: vertical; }
-    input:focus, textarea:focus { outline: 2px solid rgba(21,128,61,.3); border-color: var(--green); }
+    input:focus, textarea:focus { outline: 2px solid rgba(20,122,67,.28); border-color: var(--green); }
     .btn {
       display: inline-flex; align-items: center; justify-content: center;
-      min-height: 46px; padding: 0 22px; border-radius: 10px; border: 0;
-      font: 600 15px/1 inherit; cursor: pointer;
+      min-height: 48px; padding: 0 24px; border-radius: 999px; border: 0;
+      font: 500 15px/1 var(--sans); cursor: pointer;
     }
-    .btn.primary { background: var(--green); color: #fff; width: 100%; margin-top: 18px; }
+    .btn.primary { background: var(--green); color: #fff; width: 100%; margin-top: 20px; }
     .btn.primary:hover { background: var(--green-hover); }
     .btn.primary:disabled, .btn.ghost:disabled { opacity: .5; cursor: default; }
-    .btn.ghost { background: #fff; color: var(--green); border: 1px solid var(--green); width: 100%; margin-top: 10px; text-decoration: none; }
+    .btn.ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); width: 100%; margin-top: 10px; text-decoration: none; }
     .btn.green { background: var(--green); color: #fff; width: 100%; margin-top: 10px; gap: 8px; }
     .btn.green:hover { background: var(--green-hover); }
     .stars { color: #facc15; letter-spacing: 1px; font-size: 15px; line-height: 1; }
     .err { color: #b91c1c; font-size: 14px; text-align: center; min-height: 20px; margin-top: 10px; }
     .ok { color: #166534; }
     .hidden { display: none !important; }
-    .stage { text-align: center; color: var(--mute); margin: 20px 0 8px; }
-    .hint { text-align: center; color: var(--mute); font-size: 13px; margin: 0 0 18px; }
+    .stage { text-align: left; color: var(--ink); font-size: 22px; font-weight: 500; letter-spacing: -.02em; margin: 8px 0 8px; }
+    .hint { text-align: left; color: var(--mute); font-size: 15px; margin: 0 0 18px; }
     .cards { display: flex; flex-direction: column; gap: 14px; }
-    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 18px 16px; }
-    .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--mute); margin: 0 0 10px; font-weight: 700; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 20px 20px 18px; }
+    .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--mute); margin: 0 0 10px; font-weight: 600; }
     .card p { margin: 0; }
     .card ul { margin: 8px 0 0; padding-left: 18px; }
     .card li { margin: 6px 0; }
-    .sev { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .08em; padding: 4px 8px; border-radius: 6px; }
+    .sev { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .06em; padding: 4px 10px; border-radius: 999px; }
     .sev.HIGH { background: #ffedd5; color: var(--high); }
     .sev.MEDIUM { background: #fef9c3; color: var(--med); }
     .sev.LOW { background: #ecfccb; color: var(--low); }
@@ -87,101 +156,279 @@
     .peer b { color: var(--green); }
     .peer span { display: block; color: var(--mute); font-size: 13px; margin-top: 4px; }
     .lock {
-      position: fixed; left: 14px; bottom: 14px; width: 36px; height: 36px;
-      border-radius: 10px; border: 1px solid var(--line); background: #fff;
+      position: fixed; left: 14px; bottom: 14px; width: 40px; height: 40px;
+      border-radius: 999px; border: 1px solid var(--line); background: #fff;
       cursor: pointer; color: var(--mute); font-size: 16px;
     }
-    .note { text-align: center; font-size: 14px; margin-top: 12px; color: var(--mute); }
+    .note { text-align: left; font-size: 14px; margin-top: 12px; color: var(--mute); }
     .note.bad { color: #b91c1c; }
     .note.good { color: #166534; }
     .caveat { color: var(--mute); font-size: 13px; margin-top: 10px; }
     .actions { margin-top: 8px; }
     .back {
       background: none; border: 0; color: var(--green); cursor: pointer;
-      font: 600 14px/1 inherit; padding: 0; margin: 0 0 14px;
+      font: 500 14px/1 inherit; padding: 0; margin: 0 0 14px;
     }
     .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; }
-    .toolbar .btn.ghost { width: auto; margin-top: 0; min-height: 40px; padding: 0 14px; font-size: 14px; }
+    .toolbar .btn.ghost { width: auto; margin-top: 0; min-height: 40px; padding: 0 16px; font-size: 14px; }
     .tip-amts { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
     .tip-amts button {
-      background: #fff; border: 1px solid var(--line); border-radius: 8px;
-      padding: 8px 14px; font: 600 13px/1 inherit; cursor: pointer;
+      background: #fff; border: 1px solid var(--line); border-radius: 999px;
+      padding: 10px 14px; font: 500 13px/1 inherit; cursor: pointer;
       display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1;
     }
     .tip-amts button:hover, .tip-amts button.on { border-color: var(--green); color: var(--green); }
-    .tip-usd { color: #15803d; font-size: 12px; font-weight: 700; min-height: 14px; }
+    .tip-usd { color: var(--green); font-size: 12px; font-weight: 600; min-height: 14px; }
     .qr { display: flex; justify-content: center; margin: 12px 0; }
-    .qr img { width: 240px; height: 240px; background: #fff; padding: 10px; border-radius: 12px; border: 1px solid var(--line); image-rendering: pixelated; }
+    .qr img { width: 240px; height: 240px; background: #fff; padding: 10px; border-radius: 18px; border: 1px solid var(--line); image-rendering: pixelated; }
     .tip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
     .tip-row .btn { width: auto; flex: 1; min-width: 140px; margin-top: 0; }
     .modal {
       position: fixed; inset: 0; z-index: 50;
-      background: rgba(23, 23, 23, .48);
+      background: rgba(12, 13, 11, .52);
       display: flex; align-items: center; justify-content: center;
       padding: 20px;
     }
     .modal-card {
-      background: #fff; border-radius: 16px; padding: 28px 22px 18px;
+      background: #fff; border-radius: 28px; padding: 32px 24px 22px;
       width: min(440px, 100%); max-height: 90vh; overflow: auto;
       position: relative; box-shadow: 0 16px 48px rgba(0,0,0,.18);
     }
     .modal-close {
-      position: absolute; top: 8px; right: 10px;
+      position: absolute; top: 10px; right: 12px;
       background: none; border: 0; color: var(--mute);
-      font: 600 13px/1 inherit; cursor: pointer; padding: 8px;
+      font: 500 13px/1 inherit; cursor: pointer; padding: 8px;
     }
-    .modal-done { text-align: center; font-weight: 650; color: #166534; margin: 0 28px 10px; }
-    .modal-card h2 { text-align: center; }
-    .pay-usd { text-align: center; color: #15803d; font-size: 22px; font-weight: 700; margin: 8px 0 4px; }
-    .pay-sats { text-align: center; font-weight: 650; margin: 0 0 8px; }
+    .modal-done { text-align: center; font-weight: 500; color: #166534; margin: 0 28px 10px; }
+    .modal-card h2 { text-align: center; font-weight: 500; letter-spacing: -.02em; }
+    .pay-usd { text-align: center; color: var(--green); font-size: 22px; font-weight: 600; margin: 8px 0 4px; }
+    .pay-sats { text-align: center; font-weight: 500; margin: 0 0 8px; }
+    .foot { margin: 28px 8px 0; color: var(--mute); font-size: 13px; }
+
+    /* ---- Form usability ---- */
+    /* ---- Results ---- */
+    .card.start { border-color: #cfe9d8; background: #f7fcf8; }
+    .start-title { font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
+    .steps { margin: 12px 0 0; padding-left: 22px; }
+    .steps li { margin: 8px 0; padding-left: 4px; }
+    .steps li::marker { color: var(--green); font-weight: 700; }
+    .proof-head { margin-top: 16px !important; font-size: 13px; font-weight: 600; color: var(--mute); }
+    .proof { list-style: none; padding: 0; margin: 6px 0 0; }
+    .proof li { font-size: 14px; color: var(--mute); border-left: 3px solid #cfe9d8; padding: 2px 0 2px 10px; margin: 8px 0; }
+    .finding { padding: 14px 0; border-top: 1px solid var(--line); }
+    .finding:first-of-type { border-top: 0; padding-top: 4px; }
+    .finding-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; }
+    .finding .quote { font-size: 14px; color: var(--mute); font-style: italic; margin-top: 6px; }
+    .finding .fix { margin-top: 8px; font-size: 15px; }
+    .finding .fix b { color: var(--green); }
+    .sev { white-space: nowrap; }
+
+    /* ---- Simple, centered landing ---- */
+    .swap {
+      display: inline-block; color: var(--green); font-weight: 500;
+      border-bottom: 2px solid rgba(20,122,67,.25);
+      transition: opacity .25s ease, transform .25s ease;
+    }
+    .swap.out { opacity: 0; transform: translateY(6px); }
+    .hero { margin: 0 auto; text-align: center; padding: 9vh 8px 32px; }
+    .hero .lead { margin: 0 auto; max-width: 36rem; text-wrap: balance; }
+    .trust { list-style: none; padding: 0; margin: 22px 0 0; display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 18px; color: var(--mute); font-size: 14px; }
+    .trust li { display: flex; align-items: center; gap: 6px; }
+    .trust li::before { content: "✓"; color: var(--green); font-weight: 700; }
+    .sheet { max-width: 640px; margin: 0 auto; }
+    .foot { text-align: center; }
+    .sheet { scroll-margin-top: 90px; }
+    .sheet-head { margin: 0 0 20px; }
+    .sheet-head h2 { font-size: 26px; font-weight: 500; letter-spacing: -.02em; margin: 0 0 4px; }
+    .sheet-head p { margin: 0; color: var(--mute); font-size: 15px; }
+    fieldset.step { border: 0; margin: 0; padding: 0; min-width: 0; }
+    .step + .step { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--line); }
+    .step-title { float: left; width: 100%; display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; padding: 0; margin: 0 0 12px; }
+    .step-title + * { clear: both; }
+    .step-n {
+      width: 26px; height: 26px; border-radius: 999px; flex: none;
+      background: var(--ink); color: var(--mint);
+      display: grid; place-items: center; font-size: 12px; font-weight: 700;
+    }
+    .choices { margin-bottom: 0; }
+    .choice { position: relative; transition: border-color .15s, box-shadow .15s, background .15s; }
+    .choice svg { width: 22px; height: 22px; color: var(--green); margin-bottom: 6px; }
+    .choice.on { background: #f2faf4; }
+    .choice.on::after {
+      content: "✓"; position: absolute; top: 12px; right: 12px;
+      width: 20px; height: 20px; border-radius: 999px;
+      background: var(--green); color: #fff; font-size: 11px; font-weight: 700;
+      display: grid; place-items: center;
+    }
+    .choice:focus-visible, .btn:focus-visible, .link-btn:focus-visible, .back:focus-visible, .drop:focus-within {
+      outline: 3px solid rgba(20,122,67,.35); outline-offset: 2px;
+    }
+    #urlWrap label, #descWrap label, .row2 label { margin-top: 0; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    input::placeholder, textarea::placeholder { color: #a3aaa3; }
+    input[aria-invalid="true"], textarea[aria-invalid="true"], .drop.invalid { border-color: #dc2626; background: #fffafa; }
+    input[aria-invalid="true"]:focus, textarea[aria-invalid="true"]:focus { outline-color: rgba(220,38,38,.25); }
+    .field-help { font-size: 13px; color: var(--mute); margin: 6px 2px 0; }
+    .field-err { color: #b91c1c; font-size: 13px; margin: 6px 2px 0; }
+    .field-err:empty { display: none; }
+    .counter { font-size: 12px; color: var(--mute); text-align: right; margin-top: 6px; }
+    .counter.good { color: var(--green); }
+    .drop {
+      display: flex; align-items: center; gap: 14px; margin: 0;
+      border: 1.5px dashed #c5ccc4; border-radius: 16px; background: #fff;
+      padding: 18px; cursor: pointer; color: var(--mute); font-size: 13px;
+      transition: border-color .15s, background .15s;
+    }
+    .drop:hover, .drop.over { border-color: var(--green); background: #f2faf4; }
+    .drop.has-file { border-style: solid; border-color: var(--green); }
+    .drop svg { width: 28px; height: 28px; color: var(--green); flex: none; }
+    .drop strong { display: block; color: var(--ink); font-size: 15px; font-weight: 500; margin-bottom: 2px; word-break: break-all; }
+    #fileWrap + #descWrap { margin-top: 16px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    .btn.primary { margin-top: 26px; min-height: 54px; font-size: 16px; }
+    .btn .spin {
+      display: none; width: 16px; height: 16px; margin-right: 10px;
+      border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 999px;
+      animation: spin .8s linear infinite;
+    }
+    .btn.loading .spin { display: inline-block; }
+    .btn.loading { cursor: progress; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .err:empty { min-height: 0; margin: 0; }
+    .toolbar { justify-content: center; margin-top: 14px; }
+    .link-btn {
+      background: none; border: 0; padding: 4px 2px; cursor: pointer;
+      color: var(--green); font: 500 14px/1.2 var(--sans);
+    }
+    .link-btn:hover { text-decoration: underline; }
+    .link-btn.quiet { color: var(--mute); font-size: 13px; font-weight: 400; }
+    .resume-bar {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+      background: #f2faf4; border: 1px solid #cfe9d8; border-radius: 14px;
+      padding: 10px 14px; margin: 0 0 20px; font-size: 14px;
+    }
+    .progress { height: 4px; border-radius: 999px; background: #e5eee8; overflow: hidden; margin: 6px 0 14px; }
+    .progress span {
+      display: block; width: 35%; height: 100%; border-radius: 999px; background: var(--green);
+      animation: slide 1.4s ease-in-out infinite;
+    }
+    @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+    @media (prefers-reduced-motion: reduce) {
+      .progress span, .btn .spin { animation-duration: 3s; }
+      html { scroll-behavior: auto; }
+    }
+    @media (max-width: 560px) {
+      .row2 { grid-template-columns: 1fr; }
+      .sheet { padding: 22px 16px 18px; border-radius: 22px; }
+      .choices { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .choice { padding: 14px 12px; font-size: 14px; }
+      .choice span { font-size: 12px; }
+    }
+    @media (max-width: 700px) {
+      .how li { grid-template-columns: 36px 1fr; }
+      .how span { grid-column: 2; }
+      .hero { padding-top: 5vh; }
+      h1 { font-size: clamp(34px, 11vw, 48px); }
+    }
   </style>
 </head>
 <body>
+  <header class="nav">
+    <div class="nav-pill">
+      <a class="brand-lockup" href="/"><span class="mark">N</span> Northline</a>
+      <a class="nav-cta" href="#start">Start free</a>
+    </div>
+  </header>
   <div class="page">
-    <form id="form">
-      <p class="brand">Northline</p>
-      <h1>See what's still manual</h1>
-      <p class="slogan">Tell us how work comes in. We'll show what to automate first.</p>
-      <ol class="how">
-        <li><b>1</b><span>Pick one option below.</span></li>
-        <li><b>2</b><span>Add the link, file, or a short note.</span></li>
-        <li><b>3</b><span>Enter your name and email, then tap <b>See the diagnosis</b>.</span></li>
-      </ol>
-      <p class="choose-label">Choose one</p>
-      <div class="choices">
-        <button type="button" class="choice on" data-source="website">Website</button>
-        <button type="button" class="choice" data-source="social">Social media</button>
-        <button type="button" class="choice" data-source="csv">Data file / CSV</button>
-        <button type="button" class="choice" data-source="describe">Describe how you work</button>
+    <section class="hero">
+      <h1>See what's still <em>manual</em></h1>
+      <p class="lead">Share your <span class="swap" id="swap">website</span>. We'll show you what to automate first.</p>
+      <ul class="trust">
+        <li>Free to try</li>
+        <li>No account needed</li>
+        <li>Results in about a minute</li>
+      </ul>
+    </section>
+    <div class="sheet" id="start">
+    <form id="form" novalidate>
+
+      <div class="resume-bar hidden" id="resumeBar">
+        <span>You have a diagnosis from earlier.</span>
+        <button class="link-btn" id="resumeBtn" type="button">View it →</button>
       </div>
-      <p class="path-hint" id="pathHint">Paste the company website.</p>
-      <div id="urlWrap">
-        <label id="urlLabel" for="url">Website</label>
-        <input id="url" type="url" placeholder="https://" required />
-      </div>
-      <div id="fileWrap" class="hidden">
-        <label for="file">CSV or export</label>
-        <input id="file" type="file" accept=".csv,text/csv,text/plain" />
-      </div>
-      <div id="descWrap" class="hidden">
-        <label for="description">How work moves today</label>
-        <textarea id="description" placeholder="Who takes the lead, where it sits, what you still do by hand…" minlength="20"></textarea>
-      </div>
-      <label for="name">Your name</label>
-      <input id="name" type="text" autocomplete="name" required minlength="2" />
-      <label for="email">Email</label>
-      <input id="email" type="email" autocomplete="email" required />
-      <button class="btn primary" id="searchBtn" type="submit">See the diagnosis</button>
+
+      <fieldset class="step">
+        <legend class="step-title"><span class="step-n">1</span> Where should we look?</legend>
+        <div class="choices" role="radiogroup" aria-label="Where should we look?">
+          <button type="button" class="choice on" role="radio" aria-checked="true" tabindex="0" data-source="website">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg>
+            Website<span>The company site</span>
+          </button>
+          <button type="button" class="choice" role="radio" aria-checked="false" tabindex="-1" data-source="social">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.2c2.3 0 4 1.5 4.6 4"/></svg>
+            Social media<span>A public profile</span>
+          </button>
+          <button type="button" class="choice" role="radio" aria-checked="false" tabindex="-1" data-source="csv">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>
+            Data file / CSV<span>An export you already have</span>
+          </button>
+          <button type="button" class="choice" role="radio" aria-checked="false" tabindex="-1" data-source="describe">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>
+            Describe how you work<span>In your own words</span>
+          </button>
+        </div>
+      </fieldset>
+
+      <fieldset class="step">
+        <legend class="step-title"><span class="step-n">2</span> <span id="pathHint">Paste the company website</span></legend>
+        <div id="urlWrap">
+          <label id="urlLabel" class="sr-only" for="url">Website</label>
+          <input id="url" type="text" inputmode="url" autocomplete="url" autocapitalize="off" spellcheck="false" placeholder="yourcompany.com" aria-describedby="urlErr" />
+          <p class="field-err" id="urlErr" role="alert"></p>
+        </div>
+        <div id="fileWrap" class="hidden">
+          <label class="drop" id="drop" for="file">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+            <span><strong id="dropTitle">Choose a file or drag it here</strong><span id="dropSub">CSV or plain-text export</span></span>
+          </label>
+          <input id="file" class="sr-only" type="file" accept=".csv,.tsv,.txt,text/csv,text/plain" aria-describedby="fileErr" />
+          <p class="field-err" id="fileErr" role="alert"></p>
+        </div>
+        <div id="descWrap" class="hidden">
+          <label id="descLabel" for="description">How work moves today</label>
+          <textarea id="description" placeholder="e.g. Leads come in through our contact form and Instagram DMs. Sarah copies them into a spreadsheet each morning and emails a quote by hand…" aria-describedby="descCount descriptionErr"></textarea>
+          <div class="counter" id="descCount" aria-live="polite"></div>
+          <p class="field-err" id="descriptionErr" role="alert"></p>
+        </div>
+      </fieldset>
+
+      <fieldset class="step">
+        <legend class="step-title"><span class="step-n">3</span> Your details</legend>
+        <div class="row2">
+          <div>
+            <label for="name">Your name</label>
+            <input id="name" type="text" autocomplete="name" placeholder="Jane Smith" aria-describedby="nameErr" />
+            <p class="field-err" id="nameErr" role="alert"></p>
+          </div>
+          <div>
+            <label for="email">Email</label>
+            <input id="email" type="email" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false" placeholder="jane@company.com" aria-describedby="emailErr" />
+            <p class="field-err" id="emailErr" role="alert"></p>
+          </div>
+        </div>
+      </fieldset>
+
+      <button class="btn primary" id="searchBtn" type="submit"><span class="spin" aria-hidden="true"></span><span id="searchLabel">See the diagnosis</span></button>
+      <p class="err" id="err" role="alert"></p>
       <div class="toolbar">
-        <button class="btn ghost hidden" id="resumeBtn" type="button">Back to last diagnosis</button>
-        <button class="btn ghost" id="clearBtn" type="button">Clear my details</button>
+        <button class="link-btn quiet" id="clearBtn" type="button">Start over &amp; clear my details</button>
       </div>
-      <p class="err" id="err"></p>
     </form>
 
     <div id="live" class="hidden">
-      <button class="back" id="backBtn" type="button">← Back</button>
+      <button class="back" id="backBtn" type="button">← Back to the form</button>
       <p class="stage" id="stage">Checking public pages and web mentions…</p>
+      <div class="progress" id="progress" role="progressbar" aria-label="Working on your diagnosis"><span></span></div>
       <p class="hint" id="hint">Looking at your site plus public mentions of the company. Usually 10–20 seconds.</p>
       <div id="results" class="cards hidden"></div>
       <div class="actions">
@@ -190,6 +437,8 @@
       </div>
       <p class="note" id="note"></p>
     </div>
+    </div>
+    <p class="foot">Not a sales pitch. A look at the work you already do.</p>
   </div>
   <div id="tipModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="tipTitle">
     <div class="modal-card" id="tipBox">
@@ -236,26 +485,32 @@ const RESULT_KEY = "northline-result";
 
 function setSource(next, save){
   source = next || "website";
-  document.querySelectorAll(".choice").forEach(b => b.classList.toggle("on", b.dataset.source===source));
+  document.querySelectorAll(".choice").forEach(b => {
+    const on = b.dataset.source===source;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-checked", on ? "true" : "false");
+    b.tabIndex = on ? 0 : -1;
+  });
   const needUrl = source==="website" || source==="social";
   const needFile = source==="csv";
   const needDesc = source==="describe" || source==="csv";
   document.getElementById("urlWrap").classList.toggle("hidden", !needUrl);
   document.getElementById("fileWrap").classList.toggle("hidden", !needFile);
   document.getElementById("descWrap").classList.toggle("hidden", !needDesc);
-  document.getElementById("url").required = needUrl;
-  document.getElementById("file").required = needFile;
-  document.getElementById("description").required = needDesc;
-  document.getElementById("description").minLength = needDesc ? 20 : 0;
+  const url = document.getElementById("url");
   document.getElementById("urlLabel").textContent = source==="social" ? "Social profile link" : "Website";
+  url.placeholder = source==="social" ? "instagram.com/yourcompany" : "yourcompany.com";
+  document.getElementById("descLabel").textContent = source==="csv" ? "A short note about how you follow up" : "How work moves today";
   const hints = {
-    website: "Paste the company website.",
-    social: "Paste a public profile link.",
-    csv: "Upload the file, then add a short note about follow-up.",
-    describe: "Write how leads come in and what you do by hand.",
+    website: "Paste the company website",
+    social: "Paste a public profile link",
+    csv: "Upload the file and add a short note",
+    describe: "Tell us how leads come in and what you do by hand",
   };
   document.getElementById("pathHint").textContent = hints[source] || hints.website;
-  if (save !== false) saveDraft();
+  clearFieldErrors();
+  updateCounter();
+  if (save !== false) { lockSwap(source); saveDraft(); }
 }
 function saveDraft(){
   try {
@@ -300,23 +555,110 @@ function loadRun(){
   } catch (ex) {}
 }
 function syncResume(){
-  const btn = document.getElementById("resumeBtn");
-  if (!btn) return;
-  btn.classList.toggle("hidden", !runId);
+  const bar = document.getElementById("resumeBar");
+  if (!bar) return;
+  bar.classList.toggle("hidden", !runId);
+}
+const DESC_MIN = 20;
+const SWAP_WORDS = { website: "website", social: "social profile", csv: "data file", describe: "workflow" };
+const SWAP_ORDER = ["website", "social", "csv", "describe"];
+let swapTimer = null;
+let swapIdx = 0;
+function showSwap(key){
+  const el = document.getElementById("swap");
+  const word = SWAP_WORDS[key] || SWAP_WORDS.website;
+  if (!el || el.textContent === word) return;
+  el.classList.add("out");
+  setTimeout(() => { el.textContent = word; el.classList.remove("out"); }, 250);
+}
+function lockSwap(key){
+  if (swapTimer) clearInterval(swapTimer);
+  swapTimer = null;
+  showSwap(key);
+}
+function startSwap(){
+  if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  swapTimer = setInterval(() => {
+    swapIdx = (swapIdx + 1) % SWAP_ORDER.length;
+    showSwap(SWAP_ORDER[swapIdx]);
+  }, 2200);
+}
+const FIELD_INPUT = { url: "url", file: "file", description: "description", name: "name", email: "email" };
+function setFieldError(id, msg){
+  const el = document.getElementById(id + "Err");
+  if (el) el.textContent = msg || "";
+  if (id === "file") document.getElementById("drop").classList.toggle("invalid", !!msg);
+  else {
+    const input = document.getElementById(FIELD_INPUT[id]);
+    if (msg) input.setAttribute("aria-invalid", "true");
+    else input.removeAttribute("aria-invalid");
+  }
+}
+function clearFieldErrors(){
+  Object.keys(FIELD_INPUT).forEach(id => setFieldError(id, ""));
+  const err = document.getElementById("err");
+  if (err) err.textContent = "";
+}
+function normUrl(v){
+  v = String(v || "").trim();
+  if (!v) return "";
+  if (!/^https?:\/\//i.test(v)) v = "https://" + v.replace(/^\/+/, "");
+  return v;
+}
+function validUrl(v){
+  try {
+    const u = new URL(v);
+    return /^https?:$/.test(u.protocol) && u.hostname.includes(".") && !/\s/.test(v);
+  } catch (ex) { return false; }
+}
+function updateCounter(){
+  const el = document.getElementById("descCount");
+  if (!el) return;
+  const n = document.getElementById("description").value.trim().length;
+  if (n >= DESC_MIN) {
+    el.textContent = "✓ That's enough to start — more detail helps.";
+    el.className = "counter good";
+  } else {
+    el.textContent = n === 0 ? `A sentence or two is enough (${DESC_MIN}+ characters).` : `${DESC_MIN - n} more character${DESC_MIN - n === 1 ? "" : "s"} to go`;
+    el.className = "counter";
+  }
+}
+function showFile(file){
+  const drop = document.getElementById("drop");
+  drop.classList.toggle("has-file", !!file);
+  document.getElementById("dropTitle").textContent = file ? file.name : "Choose a file or drag it here";
+  document.getElementById("dropSub").textContent = file
+    ? `${Math.max(1, Math.round(file.size / 1024)).toLocaleString()} KB · click to choose a different file`
+    : "CSV or plain-text export";
+}
+function setBusy(busy){
+  const btn = document.getElementById("searchBtn");
+  btn.disabled = busy;
+  btn.classList.toggle("loading", busy);
+  document.getElementById("searchLabel").textContent = busy ? "Starting your diagnosis…" : "See the diagnosis";
+}
+function scrollToSheet(){
+  const sheet = document.getElementById("start");
+  const top = sheet.getBoundingClientRect().top;
+  if (top < 0 || top > window.innerHeight * 0.6) sheet.scrollIntoView({ block: "start" });
 }
 function showForm(push){
   document.getElementById("form").classList.remove("hidden");
   document.getElementById("live").classList.add("hidden");
-  document.getElementById("searchBtn").disabled = false;
+  setBusy(false);
   syncResume();
   if (push !== false) history.pushState({ page: "form" }, "", location.pathname + location.search);
+  scrollToSheet();
 }
 function showLive(push){
   document.getElementById("form").classList.add("hidden");
   document.getElementById("live").classList.remove("hidden");
   if (push !== false) history.pushState({ page: "live" }, "", "#diagnosis");
+  scrollToSheet();
 }
 function clearMine(){
+  const hasAny = runId || ["url","description","name","email"].some(id => document.getElementById(id).value.trim());
+  if (hasAny && !confirm("Clear your saved details and last diagnosis from this browser?")) return;
   try {
     localStorage.removeItem(DRAFT_KEY);
     localStorage.removeItem(RUN_KEY);
@@ -332,6 +674,7 @@ function clearMine(){
   document.getElementById("name").value = "";
   document.getElementById("email").value = "";
   document.getElementById("file").value = "";
+  showFile(null);
   document.getElementById("err").textContent = "";
   document.getElementById("results").innerHTML = "";
   document.getElementById("results").classList.add("hidden");
@@ -344,11 +687,46 @@ function clearMine(){
   setSource("website", false);
   showForm();
 }
-document.querySelectorAll(".choice").forEach(btn => {
+const choiceBtns = Array.from(document.querySelectorAll(".choice"));
+choiceBtns.forEach((btn, i) => {
   btn.onclick = () => setSource(btn.dataset.source);
+  btn.addEventListener("keydown", (e) => {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const next = choiceBtns[(i + step + choiceBtns.length) % choiceBtns.length];
+    setSource(next.dataset.source);
+    next.focus();
+  });
 });
 ["url","description","name","email"].forEach(id => {
-  document.getElementById(id).addEventListener("input", saveDraft);
+  document.getElementById(id).addEventListener("input", () => {
+    setFieldError(id, "");
+    if (id === "description") updateCounter();
+    saveDraft();
+  });
+});
+document.getElementById("url").addEventListener("blur", (e) => {
+  const v = e.target.value.trim();
+  if (v) { e.target.value = normUrl(v); saveDraft(); }
+});
+document.getElementById("email").addEventListener("blur", (e) => {
+  const v = e.target.value.trim();
+  if (v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) setFieldError("email", "That email doesn't look quite right — check for typos.");
+});
+const fileInput = document.getElementById("file");
+fileInput.addEventListener("change", () => {
+  setFieldError("file", "");
+  showFile(fileInput.files[0] || null);
+});
+const drop = document.getElementById("drop");
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", (e) => {
+  const files = e.dataTransfer && e.dataTransfer.files;
+  if (!files || !files.length) return;
+  try { fileInput.files = files; } catch (ex) {}
+  fileInput.dispatchEvent(new Event("change"));
 });
 document.getElementById("backBtn").onclick = () => showForm();
 document.getElementById("clearBtn").onclick = clearMine;
@@ -366,33 +744,45 @@ window.addEventListener("popstate", (ev) => {
     watch();
   } else showForm(false);
 });
-function missingFields(){
+function validate(){
+  const problems = [];
   const name = document.getElementById("name").value.trim();
   const email = document.getElementById("email").value.trim();
-  const url = document.getElementById("url").value.trim();
+  const urlEl = document.getElementById("url");
   const desc = document.getElementById("description").value.trim();
   const file = document.getElementById("file").files[0];
-  if (name.length < 2) return "Enter your name.";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Enter a valid email address.";
   if (source === "website" || source === "social") {
-    if (!url) return "Fill in every field — add the link.";
+    const url = normUrl(urlEl.value);
+    if (url) urlEl.value = url;
+    const what = source === "social" ? "profile link" : "website";
+    if (!url) problems.push(["url", `Add the ${what} so we know where to look.`]);
+    else if (!validUrl(url)) problems.push(["url", `That ${what} doesn't look right — try something like ${source === "social" ? "instagram.com/yourcompany" : "yourcompany.com"}.`]);
   }
   if (source === "csv") {
-    if (!file) return "Fill in every field — attach the file.";
-    if (desc.length < 20) return "Fill in every field — add a short note about follow-up.";
+    if (!file) problems.push(["file", "Attach your CSV or export."]);
+    else if (!/\.(csv|tsv|txt)$/i.test(file.name)) problems.push(["file", "That file type isn't supported — use a .csv, .tsv or .txt export."]);
   }
-  if (source === "describe" && desc.length < 20) {
-    return "Fill in every field — tell us a little more about how work moves today.";
+  if ((source === "csv" || source === "describe") && desc.length < DESC_MIN) {
+    problems.push(["description", desc ? `Just a little more, please — at least ${DESC_MIN} characters.` : "Tell us a little about how work moves today."]);
   }
-  return "";
+  if (name.length < 2) problems.push(["name", "Enter your name."]);
+  if (!email) problems.push(["email", "Enter your email."]);
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) problems.push(["email", "That email doesn't look quite right — check for typos."]);
+  return problems;
 }
 document.getElementById("form").onsubmit = async (e) => {
   e.preventDefault();
   const err = document.getElementById("err");
-  err.textContent = "";
-  const gap = missingFields();
-  if (gap) {
-    err.textContent = gap;
+  clearFieldErrors();
+  const problems = validate();
+  if (problems.length) {
+    problems.forEach(([id, msg]) => setFieldError(id, msg));
+    err.textContent = problems.length > 1 ? `Please fix the ${problems.length} highlighted fields.` : "";
+    const first = document.getElementById(FIELD_INPUT[problems[0][0]]);
+    if (first) {
+      (problems[0][0] === "file" ? document.getElementById("drop") : first).scrollIntoView({ block: "center" });
+      first.focus({ preventScroll: true });
+    }
     return;
   }
   const email = document.getElementById("email").value.trim();
@@ -405,14 +795,14 @@ document.getElementById("form").onsubmit = async (e) => {
   const file = document.getElementById("file").files[0];
   if (file) fd.append("file", file);
   if (searchUnlock) fd.append("unlock", "1");
-  document.getElementById("searchBtn").disabled = true;
+  setBusy(true);
   try {
     const r = await fetch("/api/search", {method:"POST", body: fd});
     const data = await r.json().catch(()=>({}));
     if (r.status === 402 && data.need_payment) {
       searchUnlock = false;
       showPaywall(data);
-      document.getElementById("searchBtn").disabled = false;
+      setBusy(false);
       return;
     }
     if (!r.ok) throw new Error(typeof data.detail==="string" ? data.detail : "Could not start");
@@ -424,17 +814,40 @@ document.getElementById("form").onsubmit = async (e) => {
     document.getElementById("stage").textContent = "Checking public pages and web mentions…";
     document.getElementById("hint").textContent = "Looking at your site plus public mentions of the company. Usually 10–20 seconds.";
     watch();
+    if (data.start) startRun(data.id);
   } catch (ex) {
-    err.textContent = ex.message;
-    document.getElementById("searchBtn").disabled = false;
+    err.textContent = (ex instanceof TypeError)
+      ? "We couldn't reach the server. Check your connection and try again."
+      : (ex.message || "Something went wrong. Please try again.");
+    setBusy(false);
   }
 };
+function setProgress(on){
+  document.getElementById("progress").classList.toggle("hidden", !on);
+}
+// On serverless hosting the diagnosis runs inside this request; progress is polled separately.
+function startRun(id){
+  fetch("/api/runs/"+id+"/start", {method:"POST"}).catch(() => {});
+}
+const WATCH_LIMIT_MS = 6 * 60 * 1000;
 function watch(){
   if (poll) clearInterval(poll);
+  setProgress(true);
+  const began = Date.now();
   const tick = async () => {
-    const r = await fetch("/api/runs/"+runId);
+    if (Date.now() - began > WATCH_LIMIT_MS) {
+      clearInterval(poll);
+      setProgress(false);
+      document.getElementById("stage").textContent = "This is taking longer than usual";
+      document.getElementById("hint").textContent = "";
+      setNote("Please go back and run the diagnosis again.", "bad");
+      return;
+    }
+    let r;
+    try { r = await fetch("/api/runs/"+runId); } catch (ex) { return; }
     if (!r.ok) return;
     const d = await r.json();
+    if (d.status==="completed" || d.status==="failed") setProgress(false);
     contactEmail = d.contact_email || "";
     const p = d.progress || "Checking public pages and web mentions…";
     if (d.status==="completed") {
@@ -470,26 +883,37 @@ function renderResult(res){
   const facts = (automate.evidence || res.facts || []).filter(Boolean);
   const explore = (ch.explore || []).filter(Boolean);
   document.getElementById("results").classList.remove("hidden");
+  const steps = (automate.steps || []).filter(Boolean);
+  const missing = (ch.missing || []).filter(Boolean);
+  const prioLabel = { HIGH: "High priority", MEDIUM: "Worth fixing", LOW: "Low" };
   document.getElementById("results").innerHTML = `
     <div class="card">
-      <h2>Business operations snapshot</h2>
-      <p>Overall manual dependency: <span class="sev ${esc(overall)}">${esc(dx.overall_label || overall)}</span></p>
-      <p style="margin-top:10px">${esc(dx.summary || res.observed || "Northline could not see a clear public process yet.")}</p>
-      ${processes.length ? `<table class="ops"><thead><tr><th>Process</th><th>Current human work</th><th>Priority</th><th>Why it matters</th></tr></thead><tbody>${
-        processes.map(p => `<tr><td>${esc(p.process)}</td><td>${esc(p.human_work)}</td><td>${esc(p.priority)}</td><td>${esc(p.why)}</td></tr>`).join("")
-      }</tbody></table>` : ""}
+      <h2>What we found</h2>
+      <p class="level">Manual work score: <span class="sev ${esc(overall)}">${esc(dx.overall_label || overall)}</span></p>
+      <p style="margin-top:10px">${esc(dx.summary || res.observed || "We could not see a clear process yet.")}</p>
     </div>
-    <div class="card">
-      <h2>What to automate first</h2>
-      <p><b>${esc(automate.title || "The first handoff")}</b></p>
-      <p style="margin-top:8px">${esc(automate.reason || res.offer || "Northline did not see a single dominant public bottleneck.")}</p>
-      ${facts.length ? "<ul>"+facts.map(f=>"<li>"+esc(f)+"</li>").join("")+"</ul>" : ""}
+    <div class="card start">
+      <h2>Start here</h2>
+      <p class="start-title">${esc(automate.title || "Start with how new enquiries reach you")}</p>
+      <p style="margin-top:8px">${esc(automate.reason || res.offer || "")}</p>
+      ${steps.length ? "<ol class='steps'>"+steps.map(s=>"<li>"+esc(s)+"</li>").join("")+"</ol>" : ""}
+      ${facts.length ? "<p class='proof-head'>What we saw</p><ul class='proof'>"+facts.map(f=>"<li>"+esc(f)+"</li>").join("")+"</ul>" : ""}
     </div>
+    ${processes.length > 1 ? `<div class="card">
+      <h2>Everything we found</h2>
+      ${processes.map(p => `<div class="finding">
+        <div class="finding-top"><b>${esc(p.process)}</b><span class="sev ${esc(p.priority)}">${esc(prioLabel[p.priority] || p.priority)}</span></div>
+        <p>${esc(p.human_work)}</p>
+        ${p.proof ? `<p class="quote">${esc(p.proof)}</p>` : ""}
+        <p class="fix"><b>What to do:</b> ${esc(p.fix || p.why)}</p>
+      </div>`).join("")}
+    </div>` : ""}
     <div class="card">
-      <h2>Suggested workflow</h2>
-      <p class="flow">${esc((workflow.length ? workflow : ["Incoming enquiry","capture","follow-up","human handoff when needed"]).join(" → "))}</p>
-      ${explore.length ? "<p style='margin-top:12px'><b>Could be worth exploring</b></p><ul>"+explore.map(g=>"<li>"+esc(g)+"</li>").join("")+"</ul>" : ""}
-            <p class="caveat">${esc(dx.caveat || "Based on the information provided. Northline does not invent internal processes.")}</p>
+      <h2>How it could work</h2>
+      <p class="flow">${esc((workflow.length ? workflow : ["New enquiry","Instant reply","Saved in one list","Reminder if nobody has replied","A person steps in when needed"]).join(" → "))}</p>
+      ${missing.length ? "<p style='margin-top:12px'><b>What's missing</b></p><ul>"+missing.map(g=>"<li>"+esc(g)+"</li>").join("")+"</ul>" : ""}
+      ${explore.length ? "<p style='margin-top:12px'><b>Other ideas</b></p><ul>"+explore.map(g=>"<li>"+esc(g)+"</li>").join("")+"</ul>" : ""}
+      <p class="caveat">${esc(dx.caveat || "We only used what you shared and what we could see publicly.")}</p>
     </div>
     <div class="card">
       <h2>Like what you saw?</h2>
@@ -642,6 +1066,11 @@ async function downloadReport(){
     setNote("Run See the diagnosis again, then download the PDF.", "bad");
     return;
   }
+  const btn = document.getElementById("downloadBtn");
+  if (btn.disabled) return;
+  const keepX = window.scrollX, keepY = window.scrollY;
+  const stay = () => window.scrollTo(keepX, keepY);
+  btn.disabled = true;
   setNote("Preparing your PDF…", "");
   try {
     const r = await fetch("/api/runs/"+runId+"/report");
@@ -659,22 +1088,34 @@ async function downloadReport(){
       throw new Error(detail);
     }
     if (data.size < 40) throw new Error("Could not download the PDF.");
-    const url = URL.createObjectURL(data);
+    // Send it as a plain file so browsers save it instead of opening a PDF viewer
+    // (Firefox / iOS Safari would otherwise take the visitor off this page).
+    const file = new Blob([data], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(file);
     const a = document.createElement("a");
     a.href = url;
     a.download = "northline-report.pdf";
+    a.rel = "noopener";
+    a.style.display = "none";
     document.body.appendChild(a);
     a.click();
     a.remove();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
     setNote("Your PDF is ready. It's in your downloads.", "good");
     openTipModal(true);
+    stay();
+    requestAnimationFrame(stay);
   } catch (ex) {
     setNote(ex.message || "Could not download the PDF.", "bad");
+    stay();
+  } finally {
+    btn.disabled = false;
   }
 }
 function esc(s){ return String(s??"").replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 loadDraft();
+updateCounter();
+if (source !== "website") lockSwap(source); else startSwap();
 loadRun();
 syncResume();
 if (location.hash === "#diagnosis" && runId) {

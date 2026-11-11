@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     booking_url: str = ""
     contact_email: str = ""
     lightning_address: str = ""
+    # Serverless hosts (Vercel) freeze the process once a response is sent, so background
+    # threads never finish. When true, work runs inside a request instead. Auto-on when VERCEL is set.
+    inline_runs: bool = False
     openai_input_cost_per_1m: float = 0.15
     openai_output_cost_per_1m: float = 0.60
 
