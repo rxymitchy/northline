@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     fetch_timeout_seconds: int = 20
     fetch_delay_seconds: float = 1.2
-    user_agent: str = "Mozilla/5.0 (compatible; FindClientsAgent/1.0; +https://localhost; research)"
+    user_agent: str = "Mozilla/5.0 (compatible; Northline/1.0; +https://github.com/rxymitchy/northline)"
 
     database_url: str = "sqlite:///./data/prospects.db"
     backend_host: str = "0.0.0.0"
@@ -36,8 +36,9 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True
     outbound_send_delay_seconds: float = 4.0
 
-    admin_pin: str = "northline"
-    admin_email: str = "owner@example.com"
+    # Admin access stays off until both are set in the environment.
+    admin_pin: str = ""
+    admin_email: str = ""
     booking_url: str = ""
     contact_email: str = ""
     lightning_address: str = ""
