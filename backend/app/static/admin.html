@@ -71,18 +71,28 @@
         </thead>
         <tbody id="leads"></tbody>
       </table>
-      <h2>Outbound hunt</h2>
-      <p>Find companies with serious automation problems and email public decision-makers we can actually verify.</p>
-      <button id="go" type="button">Search companies with automation problems</button>
-      <p class="err" id="err"></p>
-      <div id="meta"></div>
-      <table><thead><tr><th>Score</th><th>Company</th><th>Gap</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table>
+      <h2>Company leads</h2>
+      <p>Every company visitors ran a diagnosis on. Contact them on the email they searched with.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Date (GMT+3)</th>
+            <th>Company</th>
+            <th>Contact</th>
+            <th>Industry</th>
+            <th>What is still manual</th>
+            <th>First step</th>
+            <th>Report</th>
+          </tr>
+        </thead>
+        <tbody id="companies"></tbody>
+      </table>
     </div>
   </div>
 <script>
 let pin = sessionStorage.getItem("adminPin") || "";
-let current = null;
-let poll = null;
+
+
 
 function headers(){
   return {"X-Admin-Pin": pin, "Content-Type": "application/json"};
@@ -124,6 +134,34 @@ async function loadLeads(){
       <td>${esc((row.detail || "").slice(0,140))}</td>
     </tr>`;
   }).join("") || "<tr><td colspan='8'>No visitor leads yet.</td></tr>";
+  await loadCompanies();
+}
+function safeUrl(u){
+  const raw = String(u || "").trim();
+  if (!raw) return "";
+  return /^https?:\/\//i.test(raw) ? raw : "https://" + raw;
+}
+async function loadCompanies(){
+  const r = await fetch("/api/company-leads", {headers: headers()});
+  if (!r.ok) return;
+  const rows = await r.json();
+  document.getElementById("companies").innerHTML = (rows||[]).map(c => {
+    const site = c.website ? `<br><a href="${esc(safeUrl(c.website))}" target="_blank" rel="noopener noreferrer">${esc(c.website)}</a>` : "";
+    const kind = {describe: "Described in a note", csv: "Sent a spreadsheet", website: "Website", social: "Social profile"}[c.source] || "Submission";
+    const company = c.company ? `<b>${esc(c.company)}</b>` : `<b>${esc(kind)}</b>`;
+    const extra = [c.phone && ("Phone: " + c.phone), c.whatsapp && ("WhatsApp: " + c.whatsapp), c.public_email && ("Public email: " + c.public_email)]
+      .filter(Boolean).map(esc).join("<br>");
+    const subject = encodeURIComponent("Your Northline snapshot");
+    return `<tr>
+      <td>${esc(c.when)}</td>
+      <td>${company}${site}${c.note ? `<br><span class="stat">${esc(c.note.slice(0,120))}</span>` : ""}</td>
+      <td>${esc(c.contact_name)}<br><a href="mailto:${esc(c.email)}?subject=${subject}">${esc(c.email)}</a>${extra ? "<br>" + extra : ""}</td>
+      <td>${esc(c.industry)}</td>
+      <td>${esc((c.manual || "").slice(0,200))}</td>
+      <td>${esc(c.first_step)}</td>
+      <td>${c.status === "completed" ? `<a href="/api/runs/${encodeURIComponent(c.run_id)}/report" target="_blank" rel="noopener">PDF</a>` : esc(c.status)}</td>
+    </tr>`;
+  }).join("") || "<tr><td colspan='7'>No company leads yet.</td></tr>";
 }
 async function boot(){
   if (!pin) {
@@ -168,41 +206,6 @@ document.getElementById("out").onclick = () => {
   showLogin();
 };
 boot();
-document.getElementById("go").onclick = async () => {
-  document.getElementById("err").textContent = "";
-  document.getElementById("go").disabled = true;
-  try {
-    const r = await fetch("/api/runs", {
-      method: "POST",
-      headers: headers(),
-      body: JSON.stringify({icp: ""})
-    });
-    const d = await r.json().catch(()=>({}));
-    if (!r.ok) throw new Error(typeof d.detail==="string" ? d.detail : "Could not start");
-    current = d.id;
-    watch();
-  } catch (e) {
-    document.getElementById("err").textContent = e.message;
-    document.getElementById("go").disabled = false;
-  }
-};
-function watch(){
-  if (poll) clearInterval(poll);
-  const tick = async () => {
-    const r = await fetch("/api/runs/"+current, {headers: headers()});
-    const d = await r.json();
-    document.getElementById("meta").textContent = `Hunt ${d.id} · ${d.status} · ${d.discovered_count} found · ${d.qualified_count} qualified`;
-    document.getElementById("rows").innerHTML = (d.companies||[]).map(c =>
-      `<tr><td>${c.lead_score??"—"}</td><td><b>${esc(c.name)}</b><br><a href="${esc(c.website)}" target="_blank">${esc(c.website)}</a></td><td>${esc((c.observed_problem||"").slice(0,160))}</td><td>${esc(c.status)}</td></tr>`
-    ).join("");
-    if (["completed","failed"].includes(d.status)) {
-      clearInterval(poll);
-      document.getElementById("go").disabled = false;
-    }
-  };
-  tick();
-  poll = setInterval(tick, 3000);
-}
 function formatEat(iso){
   if (!iso) return "";
   const raw = String(iso);
