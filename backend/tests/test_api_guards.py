@@ -1,3 +1,4 @@
+import json
 import time
 import unittest
 from unittest.mock import patch
@@ -438,6 +439,77 @@ class ApiGuardTests(unittest.TestCase):
         self.assertEqual(mine[0]["contact_name"], "Jane Bakery")
         self.assertEqual(mine[0]["run_id"], run_id)
         self.assertIn("WhatsApp", mine[0]["note"])
+
+    def test_delete_endpoints_admin_only(self):
+        self.assertEqual(self.client.post("/api/leads/delete", json={"ids": [1]}).status_code, 403)
+        self.assertEqual(self.client.post("/api/company-leads/delete", json={"ids": [1]}).status_code, 403)
+
+    def _search_lead(self, db, email, name="Del Test"):
+        from app.models import Company, Contact, ResearchRun
+
+        run = ResearchRun(
+            icp_text=json.dumps({"name": name, "email": email, "source": "describe", "description": "note"}),
+            status="completed",
+            kind="search",
+        )
+        db.add(run)
+        db.commit()
+        company = Company(run_id=run.id, name=name, source="describe")
+        db.add(company)
+        db.commit()
+        db.add(Contact(company_id=company.id, name=name, email=email))
+        db.commit()
+        return company.id
+
+    @patch("app.config.settings.admin_pin", "test-pin-1234567890")
+    def test_delete_company_leads_and_inquiries(self):
+        from app.db import SessionLocal
+        from app.models import Company, Contact, Inquiry
+
+        pin = {"X-Admin-Pin": "test-pin-1234567890"}
+        db = SessionLocal()
+        try:
+            older = self._search_lead(db, "del.one@gmail.com")
+            newer = self._search_lead(db, "del.one@gmail.com")
+            keep = self._search_lead(db, "del.keep@gmail.com")
+            other = self._search_lead(db, "del.two@gmail.com")
+            db.add(Inquiry(name="A", email="del.a@gmail.com", source_kind="describe", source_value=""))
+            db.add(Inquiry(name="B", email="del.b@gmail.com", source_kind="describe", source_value=""))
+            db.add(Inquiry(name="C", email="del.c@gmail.com", source_kind="describe", source_value=""))
+            db.commit()
+            inquiry_ids = [
+                i.id for i in db.query(Inquiry).filter(Inquiry.email.in_(["del.a@gmail.com", "del.b@gmail.com"]))
+            ]
+        finally:
+            db.close()
+
+        rows = self.client.get("/api/company-leads", headers=pin).json()
+        self.assertEqual([r["id"] for r in rows if r["email"] == "del.one@gmail.com"], [newer])
+
+        r = self.client.post("/api/company-leads/delete", headers=pin, json={"ids": [newer, other]})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["deleted"], 2)
+        emails = {row["email"] for row in self.client.get("/api/company-leads", headers=pin).json()}
+        # The older duplicate must not reappear after its newer row is deleted.
+        self.assertNotIn("del.one@gmail.com", emails)
+        self.assertNotIn("del.two@gmail.com", emails)
+        self.assertIn("del.keep@gmail.com", emails)
+
+        r = self.client.post("/api/leads/delete", headers=pin, json={"ids": inquiry_ids})
+        self.assertEqual(r.json()["deleted"], 2)
+        left = {row["email"] for row in self.client.get("/api/leads", headers=pin).json()}
+        self.assertNotIn("del.a@gmail.com", left)
+        self.assertNotIn("del.b@gmail.com", left)
+        self.assertIn("del.c@gmail.com", left)
+
+        db = SessionLocal()
+        try:
+            gone = [older, newer, other]
+            self.assertEqual(db.query(Company).filter(Company.id.in_(gone)).count(), 0)
+            self.assertEqual(db.query(Contact).filter(Contact.company_id.in_(gone)).count(), 0)
+            self.assertEqual(db.query(Company).filter(Company.id == keep).count(), 1)
+        finally:
+            db.close()
 
 
 if __name__ == "__main__":

@@ -397,21 +397,15 @@ def list_leads(db: Session = Depends(get_db), x_admin_pin: str | None = Header(d
     ]
 
 
-@router.get("/company-leads")
-def list_company_leads(db: Session = Depends(get_db), x_admin_pin: str | None = Header(default=None)):
-    """Companies visitors ran a diagnosis on, with the email they searched with as the contact."""
-    if not _admin_ok(x_admin_pin):
-        raise HTTPException(403, "Admin only")
+def _search_leads(db: Session):
+    """Yield (company, run, info) for visitor diagnoses, newest first, with the grouping key."""
     rows = (
         db.query(Company, ResearchRun)
         .join(ResearchRun, Company.run_id == ResearchRun.id)
         .filter(ResearchRun.kind == "search")
         .order_by(Company.id.desc())
-        .limit(1000)
         .all()
     )
-    leads = []
-    seen = set()
     for company, run in rows:
         sub = _json(run.icp_text)
         sub = sub if isinstance(sub, dict) else {}
@@ -424,8 +418,33 @@ def list_company_leads(db: Session = Depends(get_db), x_admin_pin: str | None = 
         own_page = source in ("website", "social")
         url = str(sub.get("url") or "").strip() if own_page else ""
         place = urlparse(url).netloc.lower().removeprefix("www.") if url else ""
-        # One row per company per email: the newest diagnosis wins.
         key = (email, place or (company.name or "").strip().lower())
+        yield company, run, {
+            "sub": sub,
+            "email": email,
+            "source": source,
+            "own_page": own_page,
+            "url": url,
+            "place": place,
+            "key": key,
+        }
+
+
+class IdsRequest(BaseModel):
+    ids: list[int]
+
+
+@router.get("/company-leads")
+def list_company_leads(db: Session = Depends(get_db), x_admin_pin: str | None = Header(default=None)):
+    """Companies visitors ran a diagnosis on, with the email they searched with as the contact."""
+    if not _admin_ok(x_admin_pin):
+        raise HTTPException(403, "Admin only")
+    leads = []
+    seen = set()
+    for company, run, info in _search_leads(db):
+        sub, email, source = info["sub"], info["email"], info["source"]
+        own_page, url, place, key = info["own_page"], info["url"], info["place"], info["key"]
+        # One row per company per email: the newest diagnosis wins.
         if key in seen:
             continue
         seen.add(key)
@@ -435,6 +454,7 @@ def list_company_leads(db: Session = Depends(get_db), x_admin_pin: str | None = 
         first = diagnosis.get("automate_first") if isinstance(diagnosis.get("automate_first"), dict) else {}
         leads.append(
             {
+                "id": company.id,
                 "run_id": run.id,
                 "status": run.status,
                 "contact_name": sub.get("name") or company.name,
@@ -455,6 +475,46 @@ def list_company_leads(db: Session = Depends(get_db), x_admin_pin: str | None = 
         if len(leads) >= 200:
             break
     return leads
+
+
+def _delete_companies(db: Session, company_ids: list[int]) -> None:
+    if not company_ids:
+        return
+    db.query(Outreach).filter(Outreach.company_id.in_(company_ids)).delete(synchronize_session=False)
+    db.query(Contact).filter(Contact.company_id.in_(company_ids)).delete(synchronize_session=False)
+    db.query(Opportunity).filter(Opportunity.company_id.in_(company_ids)).delete(synchronize_session=False)
+    db.query(Company).filter(Company.id.in_(company_ids)).delete(synchronize_session=False)
+
+
+@router.post("/company-leads/delete")
+def delete_company_leads(
+    payload: IdsRequest, db: Session = Depends(get_db), x_admin_pin: str | None = Header(default=None)
+):
+    """Delete company leads. Older diagnoses of the same company and email go too, so the row stays gone."""
+    if not _admin_ok(x_admin_pin):
+        raise HTTPException(403, "Admin only")
+    wanted = set(payload.ids or [])
+    if not wanted:
+        return {"deleted": 0}
+    leads = list(_search_leads(db))
+    keys = {info["key"] for company, _run, info in leads if company.id in wanted}
+    doomed = [company.id for company, _run, info in leads if info["key"] in keys]
+    _delete_companies(db, doomed)
+    db.commit()
+    return {"deleted": len(keys)}
+
+
+@router.post("/leads/delete")
+def delete_leads(payload: IdsRequest, db: Session = Depends(get_db), x_admin_pin: str | None = Header(default=None)):
+    """Delete inquiries (one per email). Their free-run count starts again if they come back."""
+    if not _admin_ok(x_admin_pin):
+        raise HTTPException(403, "Admin only")
+    ids = list(set(payload.ids or []))
+    if not ids:
+        return {"deleted": 0}
+    deleted = db.query(Inquiry).filter(Inquiry.id.in_(ids)).delete(synchronize_session=False)
+    db.commit()
+    return {"deleted": int(deleted or 0)}
 
 
 @router.post("/runs/{run_id}/email")

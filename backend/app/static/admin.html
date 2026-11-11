@@ -32,6 +32,15 @@
     .login-card { max-width: 420px; margin: 48px auto; background: #1e293b; padding: 28px; border-radius: 16px; }
     .hidden { display: none !important; }
     .stat { color: #cbd5e1; }
+    .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+    .bar button { padding: 8px 14px; font-size: 13px; }
+    .bar .count { color: #94a3b8; font-size: 13px; }
+    button.danger { background: #b91c1c; }
+    th.pick, td.pick, th.act, td.act { width: 28px; }
+    input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: #15803d; }
+    button.icon { background: transparent; padding: 4px; border-radius: 6px; color: #94a3b8; line-height: 0; }
+    button.icon:hover { background: #3f1d1d; color: #fca5a5; }
+    tr.picked td { background: #13233d; }
   </style>
 </head>
 <body>
@@ -56,9 +65,15 @@
       </div>
       <h2>Inquiries</h2>
       <p>One row per email. Hits is how many diagnoses that person has run.</p>
+      <div class="bar" data-table="leads">
+        <span class="count" id="leadsCount">0 selected</span>
+        <button class="ghost" type="button" data-action="download">Download CSV</button>
+        <button class="danger" type="button" data-action="delete">Delete selected</button>
+      </div>
       <table>
         <thead>
           <tr>
+            <th class="pick"><input type="checkbox" id="leadsAll" aria-label="Select all inquiries" /></th>
             <th>Last visit (GMT+3)</th>
             <th>Name</th>
             <th>Email</th>
@@ -67,15 +82,22 @@
             <th>Paid extras</th>
             <th>Help</th>
             <th>Detail</th>
+            <th class="act"></th>
           </tr>
         </thead>
         <tbody id="leads"></tbody>
       </table>
       <h2>Company leads</h2>
       <p>Every company visitors ran a diagnosis on. Contact them on the email they searched with.</p>
+      <div class="bar" data-table="companies">
+        <span class="count" id="companiesCount">0 selected</span>
+        <button class="ghost" type="button" data-action="download">Download CSV</button>
+        <button class="danger" type="button" data-action="delete">Delete selected</button>
+      </div>
       <table>
         <thead>
           <tr>
+            <th class="pick"><input type="checkbox" id="companiesAll" aria-label="Select all company leads" /></th>
             <th>Date (GMT+3)</th>
             <th>Company</th>
             <th>Contact</th>
@@ -83,14 +105,30 @@
             <th>What is still manual</th>
             <th>First step</th>
             <th>Report</th>
+            <th class="act"></th>
           </tr>
         </thead>
         <tbody id="companies"></tbody>
       </table>
+      <p class="err" id="dashErr"></p>
     </div>
   </div>
 <script>
 let pin = sessionStorage.getItem("adminPin") || "";
+const TRASH = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+const TABLES = {
+  leads: {
+    rows: [], picked: new Set(), label: "inquiries", deleteUrl: "/api/leads/delete",
+    csv: [["Last visit", "when"], ["Name", "name"], ["Email", "email"], ["Source", "source"], ["Hits", "search_count"],
+          ["Paid extras", "paid_credits"], ["Wants help", "wants_help"], ["Detail", "detail"]],
+  },
+  companies: {
+    rows: [], picked: new Set(), label: "company leads", deleteUrl: "/api/company-leads/delete",
+    csv: [["Date", "when"], ["Company", "company"], ["Website", "website"], ["Source", "source"], ["Contact name", "contact_name"],
+          ["Email", "email"], ["Phone", "phone"], ["WhatsApp", "whatsapp"], ["Public email", "public_email"], ["Industry", "industry"],
+          ["Note", "note"], ["What is still manual", "manual"], ["First step", "first_step"], ["Status", "status"]],
+  },
+};
 
 
 
@@ -121,9 +159,12 @@ async function loadLeads(){
   document.getElementById("who").textContent =
     (sessionStorage.getItem("adminEmail") || "Admin") +
     " · " + unique + " unique emails · " + hits + " total hits";
+  TABLES.leads.rows = rows || [];
+  TABLES.leads.picked.clear();
   document.getElementById("leads").innerHTML = (rows||[]).map(row => {
     const isTest = String(row.name||"").toUpperCase().startsWith("TEST") || String(row.email||"") === "northlinelimit@gmail.com";
     return `<tr>
+      <td class="pick"><input type="checkbox" data-pick="leads" value="${esc(row.id)}" aria-label="Select ${esc(row.email)}" /></td>
       <td>${esc(row.when || formatEat(row.updated_at || row.created_at))}</td>
       <td>${esc(row.name)}${isTest ? '<span class="tag">TEST</span>' : ""}</td>
       <td>${esc(row.email)}</td>
@@ -132,8 +173,10 @@ async function loadLeads(){
       <td>${esc(row.paid_credits)}</td>
       <td>${row.wants_help ? "wants help" : ""}</td>
       <td>${esc((row.detail || "").slice(0,140))}</td>
+      <td class="act"><button class="icon" type="button" data-delete="leads" value="${esc(row.id)}" title="Delete" aria-label="Delete ${esc(row.email)}">${TRASH}</button></td>
     </tr>`;
-  }).join("") || "<tr><td colspan='8'>No visitor leads yet.</td></tr>";
+  }).join("") || "<tr><td colspan='10'>No visitor leads yet.</td></tr>";
+  syncPicks("leads");
   await loadCompanies();
 }
 function safeUrl(u){
@@ -145,6 +188,8 @@ async function loadCompanies(){
   const r = await fetch("/api/company-leads", {headers: headers()});
   if (!r.ok) return;
   const rows = await r.json();
+  TABLES.companies.rows = rows || [];
+  TABLES.companies.picked.clear();
   document.getElementById("companies").innerHTML = (rows||[]).map(c => {
     const site = c.website ? `<br><a href="${esc(safeUrl(c.website))}" target="_blank" rel="noopener noreferrer">${esc(c.website)}</a>` : "";
     const kind = {describe: "Described in a note", csv: "Sent a spreadsheet", website: "Website", social: "Social profile"}[c.source] || "Submission";
@@ -153,6 +198,7 @@ async function loadCompanies(){
       .filter(Boolean).map(esc).join("<br>");
     const subject = encodeURIComponent("Your Northline snapshot");
     return `<tr>
+      <td class="pick"><input type="checkbox" data-pick="companies" value="${esc(c.id)}" aria-label="Select lead for ${esc(c.email)}" /></td>
       <td>${esc(c.when)}</td>
       <td>${company}${site}${c.note ? `<br><span class="stat">${esc(c.note.slice(0,120))}</span>` : ""}</td>
       <td>${esc(c.contact_name)}<br><a href="mailto:${esc(c.email)}?subject=${subject}">${esc(c.email)}</a>${extra ? "<br>" + extra : ""}</td>
@@ -160,9 +206,80 @@ async function loadCompanies(){
       <td>${esc((c.manual || "").slice(0,200))}</td>
       <td>${esc(c.first_step)}</td>
       <td>${c.status === "completed" ? `<a href="/api/runs/${encodeURIComponent(c.run_id)}/report" target="_blank" rel="noopener">PDF</a>` : esc(c.status)}</td>
+      <td class="act"><button class="icon" type="button" data-delete="companies" value="${esc(c.id)}" title="Delete" aria-label="Delete lead for ${esc(c.email)}">${TRASH}</button></td>
     </tr>`;
-  }).join("") || "<tr><td colspan='7'>No company leads yet.</td></tr>";
+  }).join("") || "<tr><td colspan='9'>No company leads yet.</td></tr>";
+  syncPicks("companies");
 }
+function syncPicks(name){
+  const t = TABLES[name];
+  document.querySelectorAll(`input[data-pick="${name}"]`).forEach(box => {
+    box.checked = t.picked.has(Number(box.value));
+    box.closest("tr").classList.toggle("picked", box.checked);
+  });
+  const all = document.getElementById(name + "All");
+  all.checked = t.rows.length > 0 && t.picked.size === t.rows.length;
+  all.indeterminate = t.picked.size > 0 && t.picked.size < t.rows.length;
+  document.getElementById(name + "Count").textContent = t.picked.size
+    ? t.picked.size + " selected"
+    : "None selected · Download CSV gets all rows";
+  document.querySelector(`.bar[data-table="${name}"] button[data-action="delete"]`).disabled = t.picked.size === 0;
+}
+function csvCell(v){
+  const s = String(v ?? "");
+  // A leading = + - @ would run as a formula in Excel, so neutralise it.
+  const safe = /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+  return '"' + safe.replace(/"/g, '""') + '"';
+}
+function downloadCsv(name){
+  const t = TABLES[name];
+  const rows = t.picked.size ? t.rows.filter(r => t.picked.has(Number(r.id))) : t.rows;
+  const lines = [t.csv.map(c => csvCell(c[0])).join(",")]
+    .concat(rows.map(r => t.csv.map(c => csvCell(r[c[1]])).join(",")));
+  const blob = new Blob(["﻿" + lines.join("\r\n")], {type: "text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `northline-${name}-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+async function deleteRows(name, ids){
+  const t = TABLES[name];
+  if (!ids.length) return;
+  const what = ids.length === 1 ? "this row" : `these ${ids.length} ${t.label}`;
+  const note = name === "leads" ? "\n\nIf they come back, their 5 free diagnoses start again." : "";
+  if (!confirm(`Delete ${what}? This cannot be undone.${note}`)) return;
+  const err = document.getElementById("dashErr");
+  err.textContent = "";
+  const r = await fetch(t.deleteUrl, {method: "POST", headers: headers(), body: JSON.stringify({ids})});
+  if (r.status === 403) { showLogin(); return; }
+  if (!r.ok) { err.textContent = "Could not delete. Try again."; return; }
+  await loadLeads();
+}
+document.getElementById("dash").addEventListener("change", (e) => {
+  const box = e.target;
+  if (box.dataset.pick) {
+    const t = TABLES[box.dataset.pick];
+    box.checked ? t.picked.add(Number(box.value)) : t.picked.delete(Number(box.value));
+    syncPicks(box.dataset.pick);
+  } else if (box.id === "leadsAll" || box.id === "companiesAll") {
+    const name = box.id.replace("All", "");
+    const t = TABLES[name];
+    t.picked = new Set(box.checked ? t.rows.map(r => Number(r.id)) : []);
+    syncPicks(name);
+  }
+});
+document.getElementById("dash").addEventListener("click", (e) => {
+  const del = e.target.closest("button[data-delete]");
+  if (del) { deleteRows(del.dataset.delete, [Number(del.value)]); return; }
+  const act = e.target.closest(".bar button[data-action]");
+  if (!act) return;
+  const name = act.closest(".bar").dataset.table;
+  if (act.dataset.action === "download") downloadCsv(name);
+  if (act.dataset.action === "delete") deleteRows(name, [...TABLES[name].picked]);
+});
 async function boot(){
   if (!pin) {
     showLogin();
