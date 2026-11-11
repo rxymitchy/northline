@@ -172,3 +172,19 @@ class ApiUsage(Base):
     tokens_out: Mapped[int] = mapped_column(Integer, default=0)
     estimated_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class Payment(Base):
+    """A Lightning invoice shown on the paywall. Used once, and only after Blink says it is settled."""
+
+    __tablename__ = "payments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    email: Mapped[str] = mapped_column(String(200), index=True)
+    invoice: Mapped[str] = mapped_column(Text)
+    verify_url: Mapped[str] = mapped_column(Text, default="")
+    amount_sats: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending | used
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

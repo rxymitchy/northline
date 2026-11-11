@@ -477,7 +477,8 @@ let source = "website";
 let runId = null;
 let poll = null;
 let contactEmail = "";
-let searchUnlock = false;
+// Paywall reference from the server; sent back so it can confirm the invoice was paid.
+let payToken = "";
 let payInvoice = "";
 const DRAFT_KEY = "northline-draft";
 const RUN_KEY = "northline-run";
@@ -665,7 +666,7 @@ function clearMine(){
     localStorage.removeItem(RESULT_KEY);
   } catch (ex) {}
   runId = null;
-  searchUnlock = false;
+  payToken = "";
   payInvoice = "";
   if (poll) clearInterval(poll);
   poll = null;
@@ -794,19 +795,24 @@ document.getElementById("form").onsubmit = async (e) => {
   fd.append("description", document.getElementById("description").value.trim());
   const file = document.getElementById("file").files[0];
   if (file) fd.append("file", file);
-  if (searchUnlock) fd.append("unlock", "1");
+  if (payToken) fd.append("payment", payToken);
   setBusy(true);
   try {
     const r = await fetch("/api/search", {method:"POST", body: fd});
     const data = await r.json().catch(()=>({}));
     if (r.status === 402 && data.need_payment) {
-      searchUnlock = false;
-      showPaywall(data);
       setBusy(false);
+      if (data.pending) payPending(data.message);
+      else showPaywall(data);
       return;
     }
-    if (!r.ok) throw new Error(typeof data.detail==="string" ? data.detail : "Could not start");
-    searchUnlock = false;
+    if (!r.ok) {
+      const msg = typeof data.detail==="string" ? data.detail : "Could not start";
+      if (payModalOpen()) { payPending(msg); setBusy(false); return; }
+      throw new Error(msg);
+    }
+    payToken = "";
+    closePayModal();
     runId = data.id;
     saveDraft();
     saveRun();
@@ -819,6 +825,7 @@ document.getElementById("form").onsubmit = async (e) => {
     err.textContent = (ex instanceof TypeError)
       ? "We couldn't reach the server. Check your connection and try again."
       : (ex.message || "Something went wrong. Please try again.");
+    if (payModalOpen()) payPending(err.textContent);
     setBusy(false);
   }
 };
@@ -964,6 +971,8 @@ function showPaywall(data){
   qr.replaceChildren();
   const png = String(data.qr_png || "");
   payInvoice = String(data.invoice || "").trim().toLowerCase();
+  payToken = String(data.payment || "");
+  setPayChecking(false);
   const copyBtn = document.getElementById("payCopyBtn");
   copyBtn.classList.add("hidden");
   if (png.startsWith("data:image/png;base64,")) {
@@ -992,9 +1001,24 @@ document.getElementById("payClose").onclick = closePayModal;
 document.getElementById("payModal").onclick = (e) => {
   if (e.target.id === "payModal") closePayModal();
 };
+function payModalOpen(){
+  return !document.getElementById("payModal").classList.contains("hidden");
+}
+function setPayChecking(on){
+  const btn = document.getElementById("payContinue");
+  btn.disabled = on;
+  btn.textContent = on ? "Checking your payment…" : "I've paid — see the diagnosis";
+}
+// Not paid yet (or could not check): keep the same code on screen so they can pay or retry.
+function payPending(message){
+  setPayChecking(false);
+  document.getElementById("payStatus").textContent = message || "We haven't received the payment yet. Try again in a few seconds.";
+  document.getElementById("payModal").classList.remove("hidden");
+}
 document.getElementById("payContinue").onclick = () => {
-  searchUnlock = true;
-  closePayModal();
+  if (!payToken) return;
+  setPayChecking(true);
+  document.getElementById("payStatus").textContent = "Checking with your wallet provider…";
   document.getElementById("form").requestSubmit();
 };
 document.getElementById("tipClose").onclick = closeTipModal;
